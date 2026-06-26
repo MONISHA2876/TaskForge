@@ -14,8 +14,14 @@ export interface TimelineItem {
   aiNote: string;
 }
 
-interface PlanTimelineProps {
+export interface TimelineDay {
+  day: string;
+  date: string;
   items: TimelineItem[];
+}
+
+interface PlanTimelineProps {
+  days: TimelineDay[];
 }
 
 const PERIOD_COLORS: Record<
@@ -147,48 +153,37 @@ const TASK_STYLES = {
   },
 } as const;
 
-export default function PlanTimeline({ items }: PlanTimelineProps) {
-  const grouped = items.reduce<Record<string, TimelineItem[]>>((acc, item) => {
-    if (!acc[item.period]) acc[item.period] = [];
-    acc[item.period].push(item);
-    return acc;
-  }, {});
-
-  const periods = ["Morning", "Afternoon", "Evening", "Night"] as const;
-
-  const presentPeriods = periods.filter((p) => grouped[p]?.length > 0);
-
+export default function PlanTimeline({ days }: PlanTimelineProps) {
   return (
     <div className="flex flex-col gap-6">
-      {presentPeriods.map((period, groupIdx) => (
+      {days.map((day, dayIdx) => (
         <motion.div
-          key={period}
+          key={`${day.day}-${day.date}`}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{
             duration: 0.45,
-            delay: groupIdx * 0.12,
+            delay: dayIdx * 0.12,
             ease: [0.22, 1, 0.36, 1],
           }}
         >
-          {/* Period */}
-
           <div className="flex items-center gap-2 mb-3">
-            <span
-              className={`w-2 h-2 rounded-full ${PERIOD_COLORS[period].dot}`}
-            />
+            <span className="w-2 h-2 rounded-full bg-[#4F46E5]" />
 
-            <span
-              className={`text-[11px] font-semibold uppercase tracking-widest ${PERIOD_COLORS[period].label}`}
-            >
-              {period}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-[#4F46E5]">
+                Day {dayIdx + 1}
+              </span>
+              <span className="text-sm font-semibold text-[#111827]">
+                {day.day}
+              </span>
+            </div>
+
+            <span className="text-xs text-[#6B7280]">{day.date}</span>
           </div>
 
-          {/* Timeline */}
-
           <div className="flex flex-col gap-3 pl-4 border-l-2 border-[#F3F4F6]">
-            {grouped[period].map((item, itemIdx) => {
+            {day.items.map((item, itemIdx) => {
               const style =
                 TASK_STYLES[
                   item.taskType.toLowerCase() as keyof typeof TASK_STYLES
@@ -207,13 +202,11 @@ export default function PlanTimeline({ items }: PlanTimelineProps) {
                   }}
                   transition={{
                     duration: 0.38,
-                    delay: groupIdx * 0.12 + itemIdx * 0.07,
+                    delay: dayIdx * 0.12 + itemIdx * 0.07,
                     ease: [0.22, 1, 0.36, 1],
                   }}
                 >
                   <div className="relative rounded-2xl border border-[#F3F4F6] bg-white p-4 shadow-sm hover:shadow-md hover:border-[#E5E7EB] transition-all duration-200">
-                    {/* Accent */}
-
                     <div
                       className="absolute left-0 top-4 bottom-4 w-1 rounded-full"
                       style={{
@@ -222,8 +215,6 @@ export default function PlanTimeline({ items }: PlanTimelineProps) {
                     />
 
                     <div className="pl-4 flex flex-col gap-2">
-                      {/* Header */}
-
                       <div className="flex justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
@@ -234,7 +225,7 @@ export default function PlanTimeline({ items }: PlanTimelineProps) {
                             </h3>
                           </div>
 
-                          <div className="mt-2">
+                          <div className="mt-2 flex items-center gap-2">
                             <span
                               className={`text-[10px] font-medium px-2 py-1 rounded-full ${
                                 item.priority === "High"
@@ -245,6 +236,15 @@ export default function PlanTimeline({ items }: PlanTimelineProps) {
                               }`}
                             >
                               {item.priority}
+                            </span>
+
+                            <span
+                              className={`text-[10px] font-medium px-2 py-1 rounded-full ${PERIOD_COLORS[item.period].label}`}
+                              style={{
+                                backgroundColor: `${PERIOD_COLORS[item.period].dot.includes("bg-[#") ? "#" : ""}`,
+                              }}
+                            >
+                              {item.period}
                             </span>
                           </div>
                         </div>
@@ -265,8 +265,6 @@ export default function PlanTimeline({ items }: PlanTimelineProps) {
                           </span>
                         </div>
                       </div>
-
-                      {/* AI Note */}
 
                       <div className="flex items-start gap-2 mt-1">
                         <svg

@@ -8,7 +8,7 @@ import PlanTimeline from "@/components/planner/PlanTimeline";
 import PlanningSummary from "@/components/planner/PlanningSummary";
 import CalendarSyncCard from "@/components/planner/CalendarSyncCard";
 import EmptyState from "@/components/planner/EmptyState";
-import { generatePlan, GeneratedPlan } from "@/lib/mockPlanner";
+import { GeneratedPlan } from "@/lib/mockPlanner";
 
 export default function PlannerPage() {
   const [plan, setPlan] = useState<GeneratedPlan | null>(null);
@@ -186,13 +186,13 @@ export default function PlannerPage() {
                       />
                     </svg>
                     <span className="text-[11px] font-semibold text-[#059669]">
-                      {plan.items.length} blocks ready
+                      {plan.days.length} days planned
                     </span>
                   </motion.div>
                 </div>
 
                 {/* Timeline */}
-                <PlanTimeline items={plan.items} />
+                <PlanTimeline days={plan.days} />
 
                 {/* Summary */}
                 <PlanningSummary

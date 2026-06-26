@@ -14,49 +14,93 @@ export async function POST(req: Request) {
     const result = await model.generateContent(`
 You are Deadline Guardian AI, an intelligent productivity coach.
 
-Convert the user's goals into an optimized execution plan.
+The user will describe goals for a day, week, or month.
+
+Your responsibility is to convert those goals into a realistic execution plan.
 
 Rules:
 
 - Break large goals into smaller actionable tasks.
-- Arrange tasks logically.
+- Group tasks by day.
+- Every day must contain:
+  - day
+  - date (YYYY-MM-DD)
+  - items
+- Arrange tasks chronologically.
+- Never overlap tasks.
 - Estimate realistic durations.
 - Assign priorities (High, Medium, Low).
 - Decide the best period:
-  Morning, Afternoon, Evening, Night.
-- Generate one motivational AI note per task.
-- Never create overlapping tasks.
+  Morning
+  Afternoon
+  Evening
+  Night
+- Generate a short motivational AI note for every task.
 - Keep the schedule realistic.
+- Balance the workload across multiple days.
+- If the user asks for a weekly plan, generate all 7 days.
+- If the user asks for a daily plan, generate only one day.
+- If the user asks for a monthly plan, distribute tasks intelligently.
 - Return ONLY valid JSON.
 - Do NOT use markdown.
-- Do NOT use \`\`\`json.
-- Output ONLY the JSON object.
+- Do NOT use \`\`\`.
+- Do NOT explain anything.
 
-Schema:
+Return exactly this schema:
 
 {
   "heading": "",
   "summary": "",
+  "planType": "Daily | Weekly | Monthly",
   "productivityScore": 0,
   "focusTime": "",
   "breakTime": "",
   "completionEstimate": "",
   "totalTasks": 0,
 
-  "items": [
+  "days": [
     {
-      "id": "",
-      "title": "",
-      "taskType": "",
-      "priority": "",
-      "period": "",
-      "time": "",
-      "duration": "",
-      "completed": false,
-      "aiNote": ""
+      "day": "",
+      "date": "",
+
+      "items": [
+        {
+          "id": "",
+          "title": "",
+          "taskType": "",
+          "priority": "High | Medium | Low",
+          "period": "Morning | Afternoon | Evening | Night",
+          "time": "",
+          "duration": "",
+          "completed": false,
+          "aiNote": ""
+        }
+      ]
     }
   ]
 }
+
+Allowed taskType values:
+
+study
+revision
+practice
+assignment
+project
+coding
+meeting
+exercise
+reading
+research
+writing
+break
+personal
+errands
+shopping
+travel
+health
+work
+other
 
 User Goal:
 
@@ -67,22 +111,22 @@ ${prompt}
 
     console.log("Gemini Response:\n", text);
 
-    // Remove markdown if Gemini still returns it
     const cleaned = text
-      .replace(/```json/g, "")
+      .replace(/```json/gi, "")
       .replace(/```/g, "")
       .trim();
 
     const json = JSON.parse(cleaned);
 
     return NextResponse.json(json);
-  } catch (error: unknown) {
-    console.error(error);
+  } catch (error) {
+    console.error("Planner API Error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error: (error as Error).message,
+        message: "Failed to generate AI plan.",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
       {
         status: 500,
