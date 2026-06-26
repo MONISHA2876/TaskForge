@@ -14,15 +14,28 @@ export default function PlannerPage() {
   const [plan, setPlan] = useState<GeneratedPlan | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleGenerate = (prompt: string) => {
+  async function handleGenerate(prompt: string) {
     setIsGenerating(true);
     setPlan(null);
-    setTimeout(() => {
-      const generated = generatePlan(prompt);
-      setPlan(generated);
+
+    const res = await fetch("/api/plan", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (!res.ok) {
+      console.error(await res.text());
       setIsGenerating(false);
-    }, 2200);
-  };
+      return;
+    }
+
+    const data = await res.json();
+    setPlan(data);
+    setIsGenerating(false);
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFBFC] flex flex-col font-sans">
