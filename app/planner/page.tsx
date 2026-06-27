@@ -6,7 +6,7 @@ import PlannerHeader from "@/components/planner/PlannerHeader";
 import PromptSection from "@/components/planner/PromptSection";
 import PlanTimeline from "@/components/planner/PlanTimeline";
 import PlanningSummary from "@/components/planner/PlanningSummary";
-import CalendarSyncCard from "@/components/planner/CalendarSyncCard";
+import SavePlanCard from "@/components/planner/CalendarSyncCard";
 import EmptyState from "@/components/planner/EmptyState";
 import { GeneratedPlan } from "@/lib/mockPlanner";
 
@@ -203,8 +203,8 @@ export default function PlannerPage() {
                   productivityScore={plan.productivityScore}
                 />
 
-                {/* Calendar sync */}
-                <CalendarSyncCard />
+                {/* Save plan */}
+                <SavePlanCard plan={plan} />
               </motion.div>
             ) : null}
           </AnimatePresence>
