@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import PlannerHeader from "@/components/planner/PlannerHeader";
+import { Navbar } from "@/components/layout/Navbar";
 import PromptSection from "@/components/planner/PromptSection";
 import PlanTimeline from "@/components/planner/PlanTimeline";
 import PlanningSummary from "@/components/planner/PlanningSummary";
@@ -39,7 +39,7 @@ export default function PlannerPage() {
 
   return (
     <div className="min-h-screen bg-[#FAFBFC] flex flex-col font-sans">
-      <PlannerHeader />
+      <Navbar />
 
       <div className="flex-1 flex overflow-hidden">
         {/* LEFT PANEL */}

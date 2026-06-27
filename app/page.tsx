@@ -1,9 +1,5 @@
-import Link from "next/link";
+import HomePage from "@/components/HomePage";
 
 export default function Home() {
-  return (
-    <Link href="/planner" className="text-blue-500 underline">
-      Go to Planner
-    </Link>
-  );
+  return <HomePage />;
 }
