@@ -11,7 +11,10 @@ function getGreeting(): string {
 
 function getFormattedDate(): string {
   return new Date().toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 }
 
@@ -23,11 +26,17 @@ export function PageGreeting() {
       transition={{ duration: 0.35 }}
       style={{ marginBottom: "36px" }}
     >
-      <h1 style={{
-        fontSize: "32px", fontWeight: 800, color: "#111827",
-        letterSpacing: "-1px", lineHeight: 1.15, marginBottom: "8px",
-      }}>
-        {getGreeting()}, Alex 👋
+      <h1
+        style={{
+          fontSize: "32px",
+          fontWeight: 800,
+          color: "#111827",
+          letterSpacing: "-1px",
+          lineHeight: 1.15,
+          marginBottom: "8px",
+        }}
+      >
+        {getGreeting()}, Mona 👋
       </h1>
       <p style={{ fontSize: "15px", color: "#9CA3AF", fontWeight: 400 }}>
         {getFormattedDate()}

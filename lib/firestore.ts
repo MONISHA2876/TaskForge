@@ -1,6 +1,54 @@
 import { db } from "./firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { GeneratedPlan } from "./mockPlanner";
+import { PLACEHOLDER_PLANS } from "./placeholder-data";
+import type { Plan, PlanDay, Task } from "@/types";
+
+function normalizePlan(plan: Record<string, unknown>): Plan {
+  const rawDays = Array.isArray(plan.days)
+    ? (plan.days as Array<Record<string, unknown>>)
+    : [];
+  const days: PlanDay[] = rawDays.map((day) => ({
+    day: typeof day.day === "string" ? day.day : "",
+    date: typeof day.date === "string" ? day.date : "",
+    items: Array.isArray(day.items) ? (day.items as Task[]) : [],
+  }));
+
+  const totalTasks = days.reduce((sum, day) => sum + day.items.length, 0);
+
+  return {
+    id: typeof plan.id === "string" ? plan.id : "",
+    heading: typeof plan.heading === "string" ? plan.heading : "Untitled plan",
+    summary:
+      typeof plan.summary === "string"
+        ? plan.summary
+        : "Saved from your planner",
+    planType:
+      plan.planType === "Daily" ||
+      plan.planType === "Weekly" ||
+      plan.planType === "Monthly"
+        ? plan.planType
+        : "Weekly",
+    productivityScore: Number(plan.productivityScore || 0),
+    focusTime: typeof plan.focusTime === "string" ? plan.focusTime : "0h",
+    breakTime: typeof plan.breakTime === "string" ? plan.breakTime : "0m",
+    completionEstimate:
+      typeof plan.completionEstimate === "string"
+        ? plan.completionEstimate
+        : "Pending",
+    totalTasks: Number(plan.totalTasks || totalTasks),
+    days,
+  };
+}
 
 export async function savePlan(
   plan: GeneratedPlan,
@@ -26,5 +74,49 @@ export async function savePlan(
       success: false,
       error: error as Error,
     };
+  }
+}
+
+export async function updateTaskCompletion(
+  plan: Plan,
+  taskId: string,
+  completed: boolean,
+): Promise<boolean> {
+  try {
+    const updatedDays = plan.days.map((day) => ({
+      ...day,
+      items: day.items.map((task) =>
+        task.id === taskId ? { ...task, completed } : task,
+      ),
+    }));
+
+    await updateDoc(doc(db, "plans", plan.id), {
+      days: updatedDays,
+      updatedAt: serverTimestamp(),
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Error updating task completion:", error);
+    return false;
+  }
+}
+
+export async function fetchPlans(): Promise<Plan[]> {
+  try {
+    const plansRef = collection(db, "plans");
+    const q = query(plansRef, orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return PLACEHOLDER_PLANS;
+    }
+
+    return snapshot.docs.map((doc) =>
+      normalizePlan({ id: doc.id, ...doc.data() }),
+    );
+  } catch (error) {
+    console.error("Error fetching plans:", error);
+    return PLACEHOLDER_PLANS;
   }
 }
