@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(req: Request) {
+  const date = new Date();
   try {
     const { prompt } = await req.json();
 
@@ -17,6 +18,8 @@ You are Deadline Guardian AI, an intelligent productivity coach.
 The user will describe goals for a day, week, or month.
 
 Your responsibility is to convert those goals into a realistic execution plan.
+
+Today's date is ${date.toISOString().split("T")[0]}.
 
 Rules:
 
