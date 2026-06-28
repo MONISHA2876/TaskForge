@@ -235,7 +235,6 @@ export function PlanCard({ plan, stats, onDelete }: PlanCardProps) {
             textDecoration: "none",
             display: "inline-flex",
             alignItems: "center",
-            justifyContent: "center",
           }}
         >
           View details
