@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/auth-context";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -19,6 +20,9 @@ function getFormattedDate(): string {
 }
 
 export function PageGreeting() {
+  const { user } = useAuth();
+  const displayName = user?.email?.split("@")[0] ?? "User";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -36,7 +40,7 @@ export function PageGreeting() {
           marginBottom: "8px",
         }}
       >
-        {getGreeting()}, Mona 👋
+        {getGreeting()}, {displayName} 👋
       </h1>
       <p style={{ fontSize: "15px", color: "#9CA3AF", fontWeight: 400 }}>
         {getFormattedDate()}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Navbar } from "@/components/layout/Navbar";
-import PromptSection from "@/components/planner/PromptSection";
+import ChatPrompt from "@/components/planner/ChatPromptSection";
 import PlanTimeline from "@/components/planner/PlanTimeline";
 import PlanningSummary from "@/components/planner/PlanningSummary";
 import SavePlanCard from "@/components/planner/CalendarSyncCard";
@@ -45,7 +45,7 @@ export default function PlannerPage() {
         {/* LEFT PANEL */}
         <div className="w-[420px] flex-shrink-0 border-r border-[#E5E7EB] overflow-y-auto">
           <div className="p-8 pb-10">
-            <PromptSection
+            <ChatPrompt
               onGenerate={handleGenerate}
               isGenerating={isGenerating}
             />

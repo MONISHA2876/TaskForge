@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
-import { Search, Bell, Settings } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, Bell, Settings, LogIn, LogOut } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 
@@ -71,60 +73,94 @@ function IconButton({
   badge?: boolean;
 }) {
   return (
-    <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+    <button
+      type="button"
       aria-label={label}
-      className="relative w-[34px] h-[34px] rounded-lg border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+      className="relative rounded-full p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
     >
       {children}
-      {badge && (
-        <span className="absolute top-[6px] right-[6px] w-[7px] h-[7px] bg-red-500 rounded-full border-[1.5px] border-white" />
-      )}
-    </motion.button>
+      {badge ? (
+        <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-indigo-500" />
+      ) : null}
+    </button>
   );
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function UserAvatar() {
+function UserAvatar({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick?: () => void;
+}) {
   return (
-    <motion.div
+    <motion.button
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
+      onClick={onClick}
       className="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[12px] font-bold text-white cursor-pointer border-2 border-white shadow-[0_0_0_1.5px_#4F46E5]"
       aria-label="User profile"
     >
-      AJ
-    </motion.div>
+      {label}
+    </motion.button>
   );
 }
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 
 export function Navbar() {
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+
   return (
-    <header className="sticky top-0 z-50 h-[60px] px-6 flex items-center gap-4 bg-white border-b border-gray-200">
-      <Logo />
+    <>
+      <header className="sticky top-0 z-50 h-[60px] px-6 flex items-center gap-4 bg-white/90 backdrop-blur border-b border-gray-200">
+        <Logo />
 
-      <nav className="flex items-center gap-1 flex-1 justify-center">
-        {NAV_LINKS.map((link) => (
-          <NavItem key={link.href} {...link} />
-        ))}
-      </nav>
+        <nav className="flex items-center gap-1 flex-1 justify-center">
+          {NAV_LINKS.map((link) => (
+            <NavItem key={link.href} {...link} />
+          ))}
+        </nav>
 
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <IconButton label="Search">
-          <Search size={15} />
-        </IconButton>
-        <IconButton label="Notifications" badge>
-          <Bell size={15} />
-        </IconButton>
-        <UserAvatar />
-        <IconButton label="Settings">
-          <Settings size={15} />
-        </IconButton>
-      </div>
-    </header>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <IconButton label="Search">
+            <Search size={15} />
+          </IconButton>
+          <IconButton label="Notifications" badge>
+            <Bell size={15} />
+          </IconButton>
+          {user ? (
+            <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
+              <UserAvatar
+                label={user.email?.[0]?.toUpperCase() ?? "U"}
+                onClick={() => router.push("/")}
+              />
+              <button
+                onClick={() => void signOut()}
+                className="text-[12px] font-medium text-gray-600 hover:text-gray-900"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => router.push("/auth/signin")}
+              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm"
+            >
+              <LogIn size={14} />
+              Sign in
+            </motion.button>
+          )}
+          <IconButton label="Settings">
+            <Settings size={15} />
+          </IconButton>
+        </div>
+      </header>
+    </>
   );
 }

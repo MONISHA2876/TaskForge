@@ -8,9 +8,9 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { GeneratedPlan } from "./mockPlanner";
-import { PLACEHOLDER_PLANS } from "./placeholder-data";
 import type { Plan, PlanDay, Task } from "@/types";
 
 function normalizePlan(plan: Record<string, unknown>): Plan {
@@ -52,10 +52,16 @@ function normalizePlan(plan: Record<string, unknown>): Plan {
 
 export async function savePlan(
   plan: GeneratedPlan,
+  userId?: string | null,
 ): Promise<{ success: boolean; id?: string; error?: Error }> {
   try {
+    if (!userId) {
+      return { success: false, error: new Error("User must be signed in") };
+    }
+
     const docRef = await addDoc(collection(db, "plans"), {
       ...plan,
+      userId,
       status: "draft",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -102,14 +108,22 @@ export async function updateTaskCompletion(
   }
 }
 
-export async function fetchPlans(): Promise<Plan[]> {
+export async function fetchPlans(userId?: string | null): Promise<Plan[]> {
   try {
+    if (!userId) {
+      return [];
+    }
+
     const plansRef = collection(db, "plans");
-    const q = query(plansRef, orderBy("createdAt", "desc"));
+    const q = query(
+      plansRef,
+      where("userId", "==", userId),
+      orderBy("createdAt", "desc"),
+    );
     const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-      return PLACEHOLDER_PLANS;
+      return [];
     }
 
     return snapshot.docs.map((doc) =>
@@ -117,6 +131,6 @@ export async function fetchPlans(): Promise<Plan[]> {
     );
   } catch (error) {
     console.error("Error fetching plans:", error);
-    return PLACEHOLDER_PLANS;
+    return [];
   }
 }

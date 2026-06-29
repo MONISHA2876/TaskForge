@@ -11,6 +11,7 @@ import React, {
 import type { Plan } from "@/types";
 import { buildInitialTaskState, getAllTasksFromPlan } from "@/lib/utils";
 import { fetchPlans, updateTaskCompletion } from "@/lib/firestore";
+import { useAuth } from "@/lib/auth-context";
 
 // ─── Context Shape ────────────────────────────────────────────────────────────
 
@@ -28,12 +29,13 @@ const TaskContext = createContext<TaskContextValue | null>(null);
 export function TaskProvider({ children }: { children: React.ReactNode }) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [taskState, setTaskState] = useState<Record<string, boolean>>({});
+  const { user } = useAuth();
 
   useEffect(() => {
     let active = true;
 
     async function loadPlans() {
-      const fetchedPlans = await fetchPlans();
+      const fetchedPlans = await fetchPlans(user?.uid ?? null);
 
       if (!active) return;
 
@@ -46,7 +48,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user?.uid]);
 
   const toggleTask = useCallback(
     (id: string) => {

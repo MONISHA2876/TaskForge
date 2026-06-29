@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { savePlan } from "@/lib/firestore";
+import { useAuth } from "@/lib/auth-context";
 
 interface SavePlanCardProps {
   plan: any;
@@ -11,13 +12,20 @@ interface SavePlanCardProps {
 export default function SavePlanCard({ plan }: SavePlanCardProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { user } = useAuth();
 
   async function handleSave() {
     if (saving || saved) return;
 
     setSaving(true);
 
-    const res = await savePlan(plan);
+    if (!user) {
+      alert("Please sign in to save your plan.");
+      setSaving(false);
+      return;
+    }
+
+    const res = await savePlan(plan, user.uid);
 
     setSaving(false);
 
