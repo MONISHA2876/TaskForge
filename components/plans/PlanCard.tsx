@@ -6,6 +6,7 @@ import { Trash2 } from "lucide-react";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import type { Plan, PlanStats } from "@/types";
+import { useRouter } from "next/navigation";
 
 interface PlanCardProps {
   plan: Plan;
@@ -24,6 +25,8 @@ export function PlanCard({ plan, stats, onDelete }: PlanCardProps) {
     bg: "#F3F4F6",
     color: "#374151",
   };
+
+  const router = useRouter();
 
   return (
     <motion.div
@@ -206,6 +209,7 @@ export function PlanCard({ plan, stats, onDelete }: PlanCardProps) {
       <div style={{ display: "flex", gap: "10px" }}>
         <motion.button
           whileTap={{ scale: 0.97 }}
+          onClick={() => router.push(`/plans/${plan.id}`)}
           style={{
             flex: 1,
             padding: "12px 0",
@@ -221,6 +225,7 @@ export function PlanCard({ plan, stats, onDelete }: PlanCardProps) {
         >
           Continue plan →
         </motion.button>
+
         <Link
           href={`/plans/${plan.id}`}
           style={{

@@ -116,7 +116,7 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 h-[60px] px-6 flex items-center gap-4 bg-white/90 backdrop-blur border-b border-gray-200">
+      <header className="sticky top-0 z-50 h-[60px] px-6 flex items-center gap-4 bg-white backdrop-blur border-b border-gray-200">
         <Logo />
 
         <nav className="flex items-center gap-1 flex-1 justify-center">
@@ -125,25 +125,25 @@ export function Navbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <IconButton label="Search">
-            <Search size={15} />
-          </IconButton>
-          <IconButton label="Notifications" badge>
-            <Bell size={15} />
-          </IconButton>
+        <div className="flex items-center gap-1.5 shrink-0">
           {user ? (
             <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
               <UserAvatar
                 label={user.email?.[0]?.toUpperCase() ?? "U"}
                 onClick={() => router.push("/")}
               />
-              <button
-                onClick={() => void signOut()}
-                className="text-[12px] font-medium text-gray-600 hover:text-gray-900"
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  void signOut();
+                  router.push("/auth/signin");
+                }}
+                className="flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm"
               >
                 <LogOut size={14} />
-              </button>
+                Sign Out
+              </motion.button>
             </div>
           ) : (
             <motion.button
@@ -156,9 +156,6 @@ export function Navbar() {
               Sign in
             </motion.button>
           )}
-          <IconButton label="Settings">
-            <Settings size={15} />
-          </IconButton>
         </div>
       </header>
     </>

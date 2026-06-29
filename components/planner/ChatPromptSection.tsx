@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-} from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SendHorizonal, Mic, ImageIcon, X, Sparkles } from "lucide-react";
 import QuickPromptChips from "./QuickPromptChips";
@@ -78,7 +73,8 @@ export default function ChatPromptSection({
     const welcome: ChatMessage = {
       id: uid(),
       role: "assistant",
-      content: "Hi! 👋 I'm your AI productivity coach. Tell me what you'd like to accomplish — a study session, interview prep, workout plan, or anything else — and I'll ask a few questions to build the perfect plan for you.",
+      content:
+        "Hi! 👋 I'm your AI productivity coach. Tell me what you'd like to accomplish — a study session, interview prep, workout plan, or anything else — and I'll ask a few questions to build the perfect plan for you.",
       timestamp: new Date(),
     };
     setMessages([welcome]);
@@ -86,85 +82,96 @@ export default function ChatPromptSection({
 
   // ── send message ───────────────────────────────────────────────────────────
 
-  const sendMessage = useCallback(async (textOverride?: string) => {
-    const text = (textOverride ?? draft).trim();
-    const hasImage = !!attachedBase64;
+  const sendMessage = useCallback(
+    async (textOverride?: string) => {
+      const text = (textOverride ?? draft).trim();
+      const hasImage = !!attachedBase64;
 
-    if (!text && !hasImage) return;
-    if (loading) return;
+      if (!text && !hasImage) return;
+      if (loading) return;
 
-    setShowChips(false);
+      setShowChips(false);
 
-    // Build user message
-    const userMsg: ChatMessage = {
-      id: uid(),
-      role: "user",
-      content: text,
-      imagePreview: attachedPreview || undefined,
-      imageBase64: attachedBase64 || undefined,
-      imageMimeType: attachedMime || undefined,
-      timestamp: new Date(),
-    };
-
-    const nextMessages = [...messages, userMsg];
-    setMessages(nextMessages);
-    setDraft("");
-
-    // Clear attachment
-    const sentBase64 = attachedBase64;
-    const sentMime = attachedMime;
-    const sentVisionText = visionText;
-    clearAttachment();
-
-    setLoading(true);
-
-    try {
-      // Build final text — append vision-extracted text if available
-      const fullText = sentVisionText
-        ? `${text}\n\n[Image content extracted by Vision AI]:\n${sentVisionText}`
-        : text;
-
-      const res = await fetch("/api/planner-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversation: nextMessages.slice(0, -1).map((m) => ({
-            role: m.role,
-            content: m.content,
-            imageBase64: m.imageBase64,
-            imageMimeType: m.imageMimeType,
-          })),
-          userInput: fullText,
-          imageBase64: sentBase64 || undefined,
-          imageMimeType: sentMime || undefined,
-        }),
-      });
-
-      const data = await res.json();
-
-      const aiMsg: ChatMessage = {
+      // Build user message
+      const userMsg: ChatMessage = {
         id: uid(),
-        role: "assistant",
-        content: data.message ?? "I couldn't respond. Please try again.",
+        role: "user",
+        content: text,
+        imagePreview: attachedPreview || undefined,
+        imageBase64: attachedBase64 || undefined,
+        imageMimeType: attachedMime || undefined,
         timestamp: new Date(),
       };
 
-      setMessages([...nextMessages, aiMsg]);
-    } catch {
-      setMessages([
-        ...nextMessages,
-        {
+      const nextMessages = [...messages, userMsg];
+      setMessages(nextMessages);
+      setDraft("");
+
+      // Clear attachment
+      const sentBase64 = attachedBase64;
+      const sentMime = attachedMime;
+      const sentVisionText = visionText;
+      clearAttachment();
+
+      setLoading(true);
+
+      try {
+        // Build final text — append vision-extracted text if available
+        const fullText = sentVisionText
+          ? `${text}\n\n[Image content extracted by Vision AI]:\n${sentVisionText}`
+          : text;
+
+        const res = await fetch("/api/planner-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversation: nextMessages.slice(0, -1).map((m) => ({
+              role: m.role,
+              content: m.content,
+              imageBase64: m.imageBase64,
+              imageMimeType: m.imageMimeType,
+            })),
+            userInput: fullText,
+            imageBase64: sentBase64 || undefined,
+            imageMimeType: sentMime || undefined,
+          }),
+        });
+
+        const data = await res.json();
+
+        const aiMsg: ChatMessage = {
           id: uid(),
           role: "assistant",
-          content: "Something went wrong. Please try again.",
+          content: data.message ?? "I couldn't respond. Please try again.",
           timestamp: new Date(),
-        },
-      ]);
-    } finally {
-      setLoading(false);
-      inputRef.current?.focus();
-    }
-  }, [draft, messages, loading, attachedBase64, attachedPreview, attachedMime, visionText]);
+        };
+
+        setMessages([...nextMessages, aiMsg]);
+      } catch {
+        setMessages([
+          ...nextMessages,
+          {
+            id: uid(),
+            role: "assistant",
+            content: "Something went wrong. Please try again.",
+            timestamp: new Date(),
+          },
+        ]);
+      } finally {
+        setLoading(false);
+        inputRef.current?.focus();
+      }
+    },
+    [
+      draft,
+      messages,
+      loading,
+      attachedBase64,
+      attachedPreview,
+      attachedMime,
+      visionText,
+    ],
+  );
 
   // ── image attachment ────────────────────────────────────────────────────────
 
@@ -226,7 +233,7 @@ export default function ChatPromptSection({
   // ── voice ──────────────────────────────────────────────────────────────────
 
   function handleVoiceTranscript(text: string) {
-    setDraft((prev) => prev ? `${prev} ${text}` : text);
+    setDraft((prev) => (prev ? `${prev} ${text}` : text));
     inputRef.current?.focus();
   }
 
@@ -272,24 +279,54 @@ export default function ChatPromptSection({
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        style={{ display: "flex", flexDirection: "column", height: "100%", gap: "0" }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          gap: "0",
+        }}
       >
         {/* ── Header ── */}
-        <div style={{ padding: "0 0 16px 0", flexShrink: 0 }}>
+        {showChips ? (
+          <div style={{ padding: "0 0 16px 0", flexShrink: 0 }}>
+            <motion.h2
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              style={{
+                fontSize: "24px",
+                fontWeight: 700,
+                color: "#111827",
+                letterSpacing: "-0.5px",
+                lineHeight: 1.25,
+                marginBottom: "6px",
+              }}
+            >
+              What would you like
+              <br />
+              to accomplish?
+            </motion.h2>
+            <p style={{ fontSize: "13.5px", color: "#6B7280" }}>
+              Chat with AI to refine your plan — then generate it.
+            </p>
+          </div>
+        ) : (
           <motion.h2
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            style={{ fontSize: "24px", fontWeight: 700, color: "#111827", letterSpacing: "-0.5px", lineHeight: 1.25, marginBottom: "6px" }}
+            style={{
+              fontSize: "24px",
+              fontWeight: 700,
+              color: "#111827",
+              letterSpacing: "-0.5px",
+              lineHeight: 1.25,
+              marginBottom: "6px",
+            }}
           >
-            What would you like
-            <br />to accomplish?
+            Refine your plan with AI - then generate it.
           </motion.h2>
-          <p style={{ fontSize: "13.5px", color: "#6B7280" }}>
-            Chat with AI to refine your plan — then generate it.
-          </p>
-        </div>
-
+        )}
         {/* ── Quick chips (hide after first message) ── */}
         <AnimatePresence>
           {showChips && (
@@ -297,7 +334,11 @@ export default function ChatPromptSection({
               initial={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              style={{ flexShrink: 0, marginBottom: "14px", overflow: "hidden" }}
+              style={{
+                flexShrink: 0,
+                marginBottom: "14px",
+                overflow: "hidden",
+              }}
             >
               <QuickPromptChips onSelect={handleChipSelect} />
             </motion.div>
@@ -319,6 +360,7 @@ export default function ChatPromptSection({
             border: "1px solid #E5E7EB",
             borderBottom: "none",
             minHeight: 0,
+            maxHeight: "60vh",
           }}
         >
           <AnimatePresence initial={false}>
@@ -343,14 +385,16 @@ export default function ChatPromptSection({
         </AnimatePresence>
 
         {/* ── Input area ── */}
-        <div style={{
-          background: "#ffffff",
-          border: "1px solid #E5E7EB",
-          borderTop: attachedPreview ? "none" : "1px solid #E5E7EB",
-          borderRadius: attachedPreview ? "0 0 20px 20px" : "0 0 20px 20px",
-          padding: "12px 14px",
-          flexShrink: 0,
-        }}>
+        <div
+          style={{
+            background: "#ffffff",
+            border: "1px solid #E5E7EB",
+            borderTop: attachedPreview ? "none" : "1px solid #E5E7EB",
+            borderRadius: attachedPreview ? "0 0 20px 20px" : "0 0 20px 20px",
+            padding: "12px 14px",
+            flexShrink: 0,
+          }}
+        >
           <div style={{ display: "flex", alignItems: "flex-end", gap: "10px" }}>
             <textarea
               ref={inputRef}
@@ -362,9 +406,15 @@ export default function ChatPromptSection({
               placeholder="Type your message... or drop an image"
               rows={2}
               style={{
-                flex: 1, resize: "none", border: "none", outline: "none",
-                fontSize: "13.5px", color: "#111827", background: "transparent",
-                lineHeight: 1.6, fontFamily: "inherit",
+                flex: 1,
+                resize: "none",
+                border: "none",
+                outline: "none",
+                fontSize: "13.5px",
+                color: "#111827",
+                background: "transparent",
+                lineHeight: 1.6,
+                fontFamily: "inherit",
               }}
             />
 
@@ -377,7 +427,14 @@ export default function ChatPromptSection({
               onChange={handleFileChange}
             />
 
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                flexShrink: 0,
+              }}
+            >
               {/* Image button */}
               <motion.button
                 whileHover={{ scale: 1.07 }}
@@ -385,14 +442,23 @@ export default function ChatPromptSection({
                 onClick={() => fileRef.current?.click()}
                 title="Attach image"
                 style={{
-                  width: "34px", height: "34px", borderRadius: "10px",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "10px",
                   background: attachedPreview ? "#EEF2FF" : "#F3F4F6",
-                  border: attachedPreview ? "1.5px solid #A5B4FC" : "1px solid #E5E7EB",
-                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: attachedPreview
+                    ? "1.5px solid #A5B4FC"
+                    : "1px solid #E5E7EB",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   cursor: "pointer",
                 }}
               >
-                <ImageIcon size={15} color={attachedPreview ? "#4F46E5" : "#6B7280"} />
+                <ImageIcon
+                  size={15}
+                  color={attachedPreview ? "#4F46E5" : "#6B7280"}
+                />
               </motion.button>
 
               {/* Voice button */}
@@ -402,9 +468,14 @@ export default function ChatPromptSection({
                 onClick={() => setVoiceOpen(true)}
                 title="Voice input"
                 style={{
-                  width: "34px", height: "34px", borderRadius: "10px",
-                  background: "#F3F4F6", border: "1px solid #E5E7EB",
-                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "10px",
+                  background: "#F3F4F6",
+                  border: "1px solid #E5E7EB",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   cursor: "pointer",
                 }}
               >
@@ -418,26 +489,47 @@ export default function ChatPromptSection({
                 onClick={() => void sendMessage()}
                 disabled={!canSend}
                 style={{
-                  width: "34px", height: "34px", borderRadius: "10px",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "10px",
                   background: canSend ? "#4F46E5" : "#E5E7EB",
-                  border: "none", cursor: canSend ? "pointer" : "default",
-                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "none",
+                  cursor: canSend ? "pointer" : "default",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   transition: "background 0.15s",
                 }}
               >
-                <SendHorizonal size={14} color={canSend ? "#ffffff" : "#9CA3AF"} />
+                <SendHorizonal
+                  size={14}
+                  color={canSend ? "#ffffff" : "#9CA3AF"}
+                />
               </motion.button>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginTop: "8px",
+            }}
+          >
             <span style={{ fontSize: "10.5px", color: "#D1D5DB" }}>
               Enter to send · Shift+Enter for new line · Drop image to attach
             </span>
             {draft.length > 0 && (
               <button
                 onClick={() => setDraft("")}
-                style={{ fontSize: "10.5px", color: "#9CA3AF", background: "none", border: "none", cursor: "pointer" }}
+                style={{
+                  fontSize: "10.5px",
+                  color: "#9CA3AF",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
                 Clear
               </button>
@@ -455,15 +547,26 @@ export default function ChatPromptSection({
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.25 }}
                 style={{
-                  marginBottom: "10px", padding: "10px 14px",
-                  background: "#EEF2FF", borderRadius: "12px",
+                  marginBottom: "10px",
+                  padding: "10px 14px",
+                  background: "#EEF2FF",
+                  borderRadius: "12px",
                   border: "1px solid #C7D2FE",
-                  display: "flex", alignItems: "center", gap: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                 }}
               >
                 <Sparkles size={14} color="#4F46E5" />
-                <p style={{ fontSize: "12.5px", color: "#4F46E5", fontWeight: 500 }}>
-                  Happy with the details? Click Generate Plan to create your personalized schedule.
+                <p
+                  style={{
+                    fontSize: "12.5px",
+                    color: "#4F46E5",
+                    fontWeight: 500,
+                  }}
+                >
+                  Happy with the details? Click Generate Plan to create your
+                  personalized schedule.
                 </p>
               </motion.div>
             )}
@@ -475,17 +578,26 @@ export default function ChatPromptSection({
             onClick={handleGeneratePlan}
             disabled={isGenerating || messages.length < 2}
             style={{
-              width: "100%", padding: "14px", borderRadius: "16px",
-              border: "none", cursor: isGenerating || messages.length < 2 ? "not-allowed" : "pointer",
-              fontSize: "15px", fontWeight: 700,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
-              background: isGenerating || messages.length < 2
-                ? "#F3F4F6"
-                : "#4F46E5",
-              color: isGenerating || messages.length < 2 ? "#9CA3AF" : "#ffffff",
-              boxShadow: messages.length >= 2 && !isGenerating
-                ? "0 4px 16px rgba(79,70,229,0.28)"
-                : "none",
+              width: "100%",
+              padding: "14px",
+              borderRadius: "16px",
+              border: "none",
+              cursor:
+                isGenerating || messages.length < 2 ? "not-allowed" : "pointer",
+              fontSize: "15px",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "10px",
+              background:
+                isGenerating || messages.length < 2 ? "#F3F4F6" : "#4F46E5",
+              color:
+                isGenerating || messages.length < 2 ? "#9CA3AF" : "#ffffff",
+              boxShadow:
+                messages.length >= 2 && !isGenerating
+                  ? "0 4px 16px rgba(79,70,229,0.28)"
+                  : "none",
               transition: "all 0.2s",
             }}
           >
@@ -502,9 +614,22 @@ export default function ChatPromptSection({
                     {[0, 1, 2].map((i) => (
                       <motion.span
                         key={i}
-                        style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#9CA3AF", display: "block" }}
-                        animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
-                        transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
+                        style={{
+                          width: "6px",
+                          height: "6px",
+                          borderRadius: "50%",
+                          background: "#9CA3AF",
+                          display: "block",
+                        }}
+                        animate={{
+                          opacity: [0.3, 1, 0.3],
+                          scale: [0.8, 1, 0.8],
+                        }}
+                        transition={{
+                          duration: 0.8,
+                          repeat: Infinity,
+                          delay: i * 0.2,
+                        }}
                       />
                     ))}
                   </div>
@@ -519,7 +644,10 @@ export default function ChatPromptSection({
                   style={{ display: "flex", alignItems: "center", gap: "8px" }}
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 1L10.39 5.26L15 6.18L11.5 9.59L12.22 14.18L8 12L3.78 14.18L4.5 9.59L1 6.18L5.61 5.26L8 1Z" fill="currentColor" />
+                    <path
+                      d="M8 1L10.39 5.26L15 6.18L11.5 9.59L12.22 14.18L8 12L3.78 14.18L4.5 9.59L1 6.18L5.61 5.26L8 1Z"
+                      fill="currentColor"
+                    />
                   </svg>
                   Generate Plan
                 </motion.div>
