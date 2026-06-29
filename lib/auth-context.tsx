@@ -10,12 +10,18 @@ import React, {
 } from "react";
 import {
   createUserWithEmailAndPassword,
+  GithubAuthProvider,
+  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut as firebaseSignOut,
   type User,
 } from "firebase/auth";
 import { auth } from "./firebase";
+
+const googleProvider = new GoogleAuthProvider();
+const githubProvider = new GithubAuthProvider();
 
 interface AuthContextValue {
   user: User | null;
@@ -28,6 +34,8 @@ interface AuthContextValue {
     email: string,
     password: string,
   ) => Promise<{ success: boolean; message?: string }>;
+  signInWithGoogle: () => Promise<{ success: boolean; message?: string }>;
+  signInWithGithub: () => Promise<{ success: boolean; message?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -76,13 +84,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to sign in with Google. Please try again.",
+      };
+    }
+  }, []);
+
+  const signInWithGithub = useCallback(async () => {
+    try {
+      await signInWithPopup(auth, githubProvider);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to sign in with GitHub. Please try again.",
+      };
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth);
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, signIn, signUp, signOut }),
-    [user, loading, signIn, signUp, signOut],
+    () => ({
+      user,
+      loading,
+      signIn,
+      signUp,
+      signInWithGoogle,
+      signInWithGithub,
+      signOut,
+    }),
+    [
+      user,
+      loading,
+      signIn,
+      signUp,
+      signInWithGoogle,
+      signInWithGithub,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
