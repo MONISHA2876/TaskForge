@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { Search, Bell, Settings, LogIn, LogOut } from "lucide-react";
+import { motion } from "framer-motion";
+import { LogIn, LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 
-function Logo() {
+export function Logo() {
   return (
     <div className="flex items-center gap-2.5 flex-shrink-0">
       <div className="w-[34px] h-[34px] rounded-[10px] bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-[0_2px_8px_rgba(79,70,229,0.3)]">
@@ -18,10 +17,10 @@ function Logo() {
         </svg>
       </div>
       <div className="leading-none">
-        <div className="text-[15px] font-bold text-gray-900 tracking-[-0.3px]">
+        <div className="text-[15px] font-bold text-gray-900 tracking-[-0.3px] my-px">
           TaskForge
         </div>
-        <div className="text-[10px] text-gray-400 font-medium tracking-[0.3px] uppercase mt-px">
+        <div className="text-[10px] text-gray-400 font-medium tracking-[0.3px] uppercase pt-px">
           AI Productivity
         </div>
       </div>
