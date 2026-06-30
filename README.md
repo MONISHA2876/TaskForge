@@ -59,36 +59,36 @@ TaskForge packs a focused set of features, each with a quick preview below — G
     <td width="50%" valign="top">
       <h3>🔐 Email & Password Authentication</h3>
       <p>Secure, classic sign-up and login flow backed by Firebase Authentication, with validation and friendly error handling baked in.</p>
-      <img src="@file:Authentication.gif" alt="Email and password authentication demo" width="100%" />
+      <img src="./resources/Authentication.gif" alt="Email and password authentication demo" width="100%" />
     </td>
     <td width="50%" valign="top">
       <h3>🤖 AI-Powered Planning Flows</h3>
       <p>Gemini AI (<code>@google/generative-ai</code>) generates personalized, context-aware plans tailored to each user's goals.</p>
-      <img src="@file:AI_Planner.gif" alt="AI-powered planning demo" width="100%" />
+      <img src="./resources/AI_Planner.gif" alt="AI-powered planning demo" width="100%" />
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <h3>🎨 Modern, Animated UI</h3>
       <p>A responsive interface styled with Tailwind CSS and brought to life with smooth Framer Motion animations and transitions.</p>
-      <img src="@file:UI.gif" alt="Modern animated UI demo" width="100%" />
+      <img src="./resources/UI.gif" alt="Modern animated UI demo" width="100%" />
     </td>
     <td width="50%" valign="top">
-      <h3>📊 Authenticated Dashboard</h3>
-      <p>Signed-in users land on a dynamic, personalized dashboard for tracking plans and progress at a glance.</p>
-      <img src="@file:UI.gif" alt="Authenticated dashboard demo" width="100%" />
+      <h3>🏠 Guest Landing Page</h3>
+      <p>Signed-out visitors are greeted with an immersive, conversion-focused landing experience to showcase TaskForge at its best.</p>
+      <img src="./resources/Landing_Page.gif" alt="Guest landing page demo" width="100%" />
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <h3>🧠 AI Help</h3>
       <p>On-demand AI assistance helps users stay on track, answer planning questions, and fine-tune their task strategy instantly.</p>
-      <img src="@AI_Help.gif" alt="AI Help demo" width="100%" />
+      <img src="./resources/AI_Help.gif" alt="AI Help demo" width="100%" />
     </td>
     <td width="50%" valign="top">
-      <h3>🏠 Guest Landing Page</h3>
-      <p>Signed-out visitors are greeted with an immersive, conversion-focused landing experience designed to showcase TaskForge at its best.</p>
-      <img src="@file:Landing_Page.gif" alt="Guest landing page demo" width="100%" />
+      <h3>📊 Authenticated Dashboard</h3>
+      <p>Signed-in users land on a dynamic, personalized dashboard for tracking plans and progress at a glance.</p>
+      <img src="./resources/UI.gif" alt="Authenticated dashboard demo" width="100%" />
     </td>
   </tr>
 </table>
