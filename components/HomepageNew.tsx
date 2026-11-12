@@ -7,7 +7,6 @@ import {
   Lock,
   Cloud,
   BarChart3,
-  Calendar,
   ImageIcon,
   Mic,
   Sparkles,
@@ -15,10 +14,6 @@ import {
   Zap,
   TrendingUp,
   RefreshCw,
-  CheckCircle2,
-  XCircle,
-  ArrowRight,
-  Star,
 } from "lucide-react";
 import { Logo } from "@/components/layout/Navbar";
 import Image from "next/image";
@@ -191,7 +186,7 @@ export default function LandingPage() {
           <span>Build a smarter routine</span>
           <span
             className="text-violet-600 block"
-            style={{ marginTop: "-40px" }}
+            style={{ marginTop: "-10px" }}
           >
             from day one.
           </span>
