@@ -11,20 +11,8 @@ import {
 } from "lucide-react";
 import { useTaskContext } from "@/lib/task-context";
 import { getProductivitySummary } from "@/lib/utils";
+import { card, rise } from "@/components/styles/styles"
 
-/* ------------------------------------------------------------------ */
-/* Local styles / variants (same values as Dashboard.tsx)               */
-/* ------------------------------------------------------------------ */
-
-const card =
-  "rounded-2xl border border-white/[0.07] bg-gradient-to-b from-[#0e1832]/80 to-[#0a1228]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
-
-/** Same "hidden" / "show" labels as the Dashboard's page container, so the
- *  cards stagger in together with the rest of the page. */
-const rise: Variants = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: "easeOut" } },
-};
 
 /* ------------------------------------------------------------------ */
 /* Types                                                                */

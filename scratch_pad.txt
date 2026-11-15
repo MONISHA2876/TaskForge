@@ -5,6 +5,9 @@ Features :
 3. Greeing component working completly fine now
 
 
+have to figure out progress percent in fill animation in styles
+
+
 <DashboardLayout
         leftSidebar={
           <>

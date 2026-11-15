@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, type Variants } from "motion/react";
 import { useAuth } from "@/lib/auth-context";
+import { card, focusRing, rise } from "@/components/styles/styles";
 
 export function getGreeting(): string {
   const hour = new Date().getHours();
@@ -16,20 +17,6 @@ export function useUserName(): string {
   const raw = user?.email?.split("@")[0] ?? "User";
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
-
-/* ------------------------------------------------------------------ */
-/* Local styles / variants (same values as Dashboard.tsx)               */
-/* ------------------------------------------------------------------ */
-
-const card =
-  "rounded-2xl border border-white/[0.07] bg-gradient-to-b from-[#0e1832]/80 to-[#0a1228]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
-const focusRing =
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d9b77a]";
-
-const rise: Variants = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: "easeOut" } },
-};
 
 function Spark({ className = "" }: { className?: string }) {
   return (
