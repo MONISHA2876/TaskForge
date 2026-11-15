@@ -432,8 +432,6 @@ export default function LandingPage() {
                   }}
                 >
                   Everything you need.
-                  <br />
-                  Nothing you don&apos;t.
                 </h2>
               </div>
               <p className="text-[15px] text-gray-500 max-w-[260px] leading-relaxed">

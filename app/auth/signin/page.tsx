@@ -59,18 +59,7 @@ export default function SignInPage() {
         initial={{ opacity: 0, x: -24 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        style={{
-          width: "46%",
-          minHeight: "100vh",
-          position: "relative",
-          background:
-            "linear-gradient(145deg, #4F46E5 0%, #6D28D9 50%, #7C3AED 100%)",
-          display: "flex",
-          flexDirection: "column",
-          padding: "48px",
-          overflow: "hidden",
-          flexShrink: 0,
-        }}
+        className="auth_signup_right"        
       >
         {/* Decorative circles */}
         <div
