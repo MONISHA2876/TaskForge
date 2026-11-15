@@ -2,6 +2,7 @@ Features :
 
 1. SideBar done 
 2. Overview layout completed
+3. Greeing component working completly fine now
 
 
 <DashboardLayout

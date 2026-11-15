@@ -23,13 +23,13 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import Greeting from "../overview/Greeting";
 
 
 /* ------------------------------------------------------------------ */
 /* Data — replace with real data from your API / Firebase / React Query */
 /* ------------------------------------------------------------------ */
 
-const USER_NAME = "Monisha";
 
 const stats: {
   icon: LucideIcon;
@@ -271,7 +271,7 @@ function TopBar() {
           className={`flex items-center gap-1.5 rounded-full ${focusRing}`}
         >
           <span className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-[#e8cf9c] to-[#8a5a3c] font-serif text-[16px] font-medium text-[#1c1406] ring-2 ring-white/15">
-            {USER_NAME.charAt(0)}
+            USER
           </span>
           <ChevronDown className="hidden size-3.5 text-slate-400 sm:block" />
         </button>
@@ -280,82 +280,6 @@ function TopBar() {
   );
 }
 
-function Greeting() {
-  const [autopilot, setAutopilot] = useState(true);
-  const now = new Date();
-  const hour = now.getHours();
-  const greeting =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const dateLabel = now.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
-  return (
-    <motion.div variants={rise} className="flex flex-wrap items-start justify-between gap-5">
-      <div>
-        <p
-          suppressHydrationWarning
-          className="text-[12px] tracking-[0.1em] text-slate-400 uppercase"
-        >
-          {dateLabel}
-        </p>
-        <h1
-          suppressHydrationWarning
-          className="mt-3 font-serif text-[28px] leading-tight font-medium text-white sm:text-[34px]"
-        >
-          {greeting},{" "}
-          <em className="font-serif text-[#e6c78f] italic">{USER_NAME}</em>
-        </h1>
-        <p className="mt-2 text-[14px] text-slate-300">
-          Your AI productivity workspace
-        </p>
-        <motion.span
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ delay: 0.7, duration: 0.6, ease: "easeOut" }}
-          className="mt-4 block h-px w-12 origin-left bg-white/60"
-        />
-      </div>
-
-      <div className={`${card} flex min-w-[210px] flex-col gap-1.5 px-4 py-3.5`}>
-        <div className="flex items-center justify-between gap-6">
-          <span className="flex items-center gap-2 text-[14px] font-medium text-white">
-            <Spark className="size-[18px]" />
-            Autopilot
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={autopilot}
-            aria-label="Autopilot"
-            onClick={() => setAutopilot((v) => !v)}
-            className={[
-              "relative h-6 w-11 rounded-full transition-colors",
-              focusRing,
-              autopilot ? "bg-[#c9a45c]" : "bg-white/15",
-            ].join(" ")}
-          >
-            <span
-              className={[
-                "absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform",
-                autopilot ? "translate-x-5" : "translate-x-0",
-              ].join(" ")}
-            />
-          </button>
-        </div>
-        <p className="flex items-center gap-2 text-[12px] text-slate-400">
-          <span
-            className={`size-1.5 rounded-full ${autopilot ? "bg-emerald-400" : "bg-slate-500"}`}
-          />
-          {autopilot ? "AI managing your plan" : "Autopilot paused"}
-        </p>
-      </div>
-    </motion.div>
-  );
-}
 
 function StatCards() {
   return (
@@ -695,7 +619,7 @@ function RecentActivity() {
 export default function Dashboard() {
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative isolate min-h-screen overflow-hidden bg-[#070d1e] px-4 pt-5 pb-14 sm:px-8 sm:pt-7 lg:px-12">
+      <div className="relative isolate min-h-screen min-w-screen overflow-hidden bg-[#070d1e] px-4 pt-5 pb-14 sm:px-8 sm:pt-7 lg:px-12 lg:pl-[324px]">
         <BackgroundRings />
 
         <motion.div

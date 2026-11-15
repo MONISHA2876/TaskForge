@@ -20,11 +20,10 @@ import { AIInsights } from "@/components/sidebar/AIInsights";
 
 export default function HomePage() {
   return (
-    <div className="flex flex-row min-h-screen">
+    <div className="flex flex-row min-h-screen min-w-screen">
       <Sidebar />
-      <main className="lg:pl-[300px]">
-        <Dashboard />
-      </main>
+      <Dashboard />
+
     </div>
   );
 }
