@@ -5,6 +5,20 @@
   --foreground: #171717;
 }
 
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer components {
+  .scroll-container {
+    @apply overflow-y-auto no-scrollbar;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

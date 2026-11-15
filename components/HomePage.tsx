@@ -1,6 +1,8 @@
 "use client";
 
 import { Navbar } from "@/components/layout/Navbar";
+import  Sidebar  from "@/components/layout/SideBar"
+import Dashboard from "./layout/OverView";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
 // Left sidebar sections
@@ -9,7 +11,6 @@ import { MissedTasks } from "@/components/tasks/MissedTasks";
 import { ProductivitySummary } from "@/components/sidebar/ProductivitySummary";
 
 // Main content
-import { PageGreeting } from "@/components/dashboard/PageGreeting";
 import { ActivePlans } from "@/components/plans/ActivePlans";
 
 // Right sidebar sections
@@ -19,30 +20,11 @@ import { AIInsights } from "@/components/sidebar/AIInsights";
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <DashboardLayout
-        leftSidebar={
-          <>
-            <UpcomingTasks />
-            <MissedTasks />
-            <ProductivitySummary />
-          </>
-        }
-        main={
-          <>
-            <PageGreeting />
-            <ActivePlans />
-          </>
-        }
-        rightSidebar={
-          <>
-            <PlannerCTA />
-            <RecentActivity />
-            <AIInsights />
-          </>
-        }
-      />
+    <div className="flex flex-row min-h-screen">
+      <Sidebar />
+      <main className="lg:pl-[300px]">
+        <Dashboard />
+      </main>
     </div>
   );
 }
