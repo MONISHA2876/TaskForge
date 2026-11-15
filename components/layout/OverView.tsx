@@ -24,24 +24,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Greeting from "../overview/Greeting";
+import StatCards from "../overview/StatCards";
 
 
 /* ------------------------------------------------------------------ */
 /* Data — replace with real data from your API / Firebase / React Query */
 /* ------------------------------------------------------------------ */
 
-
-const stats: {
-  icon: LucideIcon;
-  value: string;
-  label: string;
-  delta?: string;
-}[] = [
-  { icon: Check, value: "9 / 22", label: "Tasks Completed", delta: "+18%" },
-  { icon: Hourglass, value: "4h 20m", label: "Focus Time", delta: "+32%" },
-  { icon: ChartColumn, value: "86%", label: "Productivity Score" },
-  { icon: Flame, value: "6 days", label: "Streak" },
-];
 
 const aiSuggestions: { icon: LucideIcon; label: string }[] = [
   { icon: Zap, label: "Prioritize your hackathon tasks" },
@@ -271,7 +260,7 @@ function TopBar() {
           className={`flex items-center gap-1.5 rounded-full ${focusRing}`}
         >
           <span className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-[#e8cf9c] to-[#8a5a3c] font-serif text-[16px] font-medium text-[#1c1406] ring-2 ring-white/15">
-            USER
+            U
           </span>
           <ChevronDown className="hidden size-3.5 text-slate-400 sm:block" />
         </button>
@@ -280,37 +269,6 @@ function TopBar() {
   );
 }
 
-
-function StatCards() {
-  return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-      {stats.map(({ icon: Icon, value, label, delta }) => (
-        <motion.div
-          key={label}
-          variants={rise}
-          whileHover={{ y: -2 }}
-          className={`${card} flex items-center gap-4 px-5 py-5`}
-        >
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-slate-100 ring-1 ring-white/[0.06]">
-            <Icon className="size-5 stroke-[1.5]" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-serif text-[22px] leading-none font-medium text-white">
-              {value}
-            </p>
-            <p className="mt-2 truncate text-[13px] text-slate-400">{label}</p>
-          </div>
-          {delta && (
-            <span className="flex items-center gap-0.5 self-start pt-0.5 text-[12px] font-medium text-emerald-400">
-              <ArrowRight className="size-3 -rotate-90" />
-              {delta}
-            </span>
-          )}
-        </motion.div>
-      ))}
-    </div>
-  );
-}
 
 function ActivePlan() {
   return (
