@@ -41,6 +41,16 @@ const fill: Variants = {
   },
 };
 
+/** Each plan card fades up with a small stagger (custom = card index) */
+const item: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: 0.25 + i * 0.08, duration: 0.5, ease: "easeOut" },
+  }),
+};
+
 const card =
   "rounded-2xl border border-white/[0.07] bg-gradient-to-b from-[#0e1832]/80 to-[#0a1228]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]";
 const focusRing =
@@ -49,4 +59,4 @@ const linkGold =
   "inline-flex items-center gap-1.5 text-[12px] font-medium text-[#ecd5a5] transition-colors hover:text-white " +
   focusRing;
 
-export {page, rise, row, bar, fill, card, focusRing, linkGold}
+export {page, rise, row, bar, fill, item, card, focusRing, linkGold}

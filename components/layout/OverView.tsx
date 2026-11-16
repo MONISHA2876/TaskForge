@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Greeting from "../overview/Greeting";
 import StatCards from "../overview/StatCards";
+import ActivePlans from "../plans/ActivePlans";
 import {page, rise, row, bar, fill, card, focusRing, linkGold} from "../styles/styles";
 
 
@@ -61,13 +62,6 @@ const activity: { kind: "done" | "add" | "ai"; text: string; time: string }[] = 
 ];
 
 const PLAN_PROGRESS = 41;
-
-
-
-/* ------------------------------------------------------------------ */
-/* Shared styles                                                        */
-/* ------------------------------------------------------------------ */
-
 
 
 /* ------------------------------------------------------------------ */
@@ -216,88 +210,6 @@ function TopBar() {
         </button>
       </div>
     </motion.div>
-  );
-}
-
-
-function ActivePlan() {
-  return (
-    <motion.section variants={rise} className={`${card} p-6`}>
-      <SectionHeader
-        title="Active Plan"
-        action={
-          <a href="/plans" className={linkGold}>
-            View all plans <ArrowRight className="size-3" />
-          </a>
-        }
-      />
-
-      <div className="mt-5 flex flex-col gap-6 md:flex-row">
-        <div className="h-[190px] w-full shrink-0 overflow-hidden rounded-xl border border-white/10 md:w-[216px]">
-          <Mountain />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <h3 className="font-serif text-[19px] font-medium text-white">
-            Hackathon Sprint Execution Plan
-          </h3>
-          <p className="mt-2 max-w-[440px] text-[13px] leading-[1.6] text-slate-400">
-            A detailed 24-hour execution plan for a hackathon, focusing on MVP
-            development, presentation and mentor rounds.
-          </p>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {["Hackathon", "MVP"].map((t) => (
-              <span
-                key={t}
-                className="rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1 text-[12px] text-slate-200"
-              >
-                {t}
-              </span>
-            ))}
-            <span className="rounded-full border border-[#c9a45c]/50 bg-[#c9a45c]/10 px-3.5 py-1 text-[12px] font-medium text-[#f0d9a8]">
-              High Priority
-            </span>
-          </div>
-
-          <div className="mt-5 flex items-center gap-4">
-            <div
-              role="progressbar"
-              aria-valuenow={PLAN_PROGRESS}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Plan progress"
-              className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]"
-            >
-              <motion.div
-                variants={fill}
-                className="h-full rounded-full bg-gradient-to-r from-[#d8bb84] to-[#f0dcae]"
-              />
-            </div>
-            <span className="font-serif text-[16px] text-white">{PLAN_PROGRESS}%</span>
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 divide-x divide-white/[0.08]">
-            {[
-              { icon: SquareCheckBig, value: "9 / 22", label: "Tasks" },
-              { icon: Clock, value: "24 hours", label: "Focus time" },
-              { icon: Calendar, value: "1 day left", label: "Est. completion" },
-            ].map(({ icon: Icon, value, label }, i) => (
-              <div
-                key={label}
-                className={`flex items-center gap-2.5 ${i === 0 ? "pr-3" : "px-3 sm:px-5"}`}
-              >
-                <Icon className="hidden size-[17px] shrink-0 stroke-[1.5] text-slate-400 sm:block" />
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium text-white">{value}</p>
-                  <p className="truncate text-[11.5px] text-slate-400">{label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </motion.section>
   );
 }
 
@@ -527,7 +439,7 @@ function RecentActivity() {
 export default function Dashboard() {
   return (
     <MotionConfig reducedMotion="user">
-      <div className="relative isolate min-h-screen min-w-screen overflow-hidden bg-[#070d1e] px-4 pt-5 pb-14 sm:px-8 sm:pt-7 lg:px-12 lg:pl-[324px]">
+      <div className="relative isolate min-h-screen min-w-screen overflow-hidden bg-[#070d1e] px-4 pt-5 pb-14 sm:px-8 sm:pt-7 lg:px-12 lg:pl-[340px]">
         <BackgroundRings />
 
         <motion.div
@@ -541,7 +453,7 @@ export default function Dashboard() {
           <StatCards />
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <ActivePlan />
+            <ActivePlans />
             <ForgeAI />
           </div>
 
