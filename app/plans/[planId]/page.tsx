@@ -1,93 +1,117 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import {
-  ChevronLeft,
   BrainCircuit,
-  SendHorizonal,
-  X,
-  Clock,
-  CheckCircle2,
-  Circle,
-  Sparkles,
   Calendar,
+  ChevronLeft,
+  Circle,
+  CircleCheck,
+  Clock,
+  Coffee,
+  LoaderCircle,
+  SendHorizontal,
+  Sparkles,
   Target,
   Timer,
-  Coffee,
+  X,
 } from "lucide-react";
 import { useTaskContext } from "@/lib/task-context";
 import { getPlanStats } from "@/lib/utils";
 import type { Plan, Task } from "@/types";
+import Sidebar from "@/components/layout/SideBar";
+import { card, focusRing, linkGold, page, rise, row } from "@/components/styles/styles"; 
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+/* ------------------------------------------------------------------ */
+/* Types                                                                */
+/* ------------------------------------------------------------------ */
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-// ─── Priority badge ───────────────────────────────────────────────────────────
+/* ------------------------------------------------------------------ */
+/* Badges                                                               */
+/* ------------------------------------------------------------------ */
+
+const badgeBase =
+  "rounded-full border px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap";
+const badgeFallback = "border-white/10 bg-white/[0.05] text-slate-300";
+
+const priorityStyles: Record<string, string> = {
+  High: "border-rose-400/25 bg-rose-400/10 text-rose-300",
+  Medium: "border-amber-400/25 bg-amber-400/10 text-amber-300",
+  Low: "border-emerald-400/25 bg-emerald-400/10 text-emerald-300",
+};
+
+const periodStyles: Record<string, string> = {
+  Morning: "border-orange-400/25 bg-orange-400/10 text-orange-300",
+  Afternoon: "border-sky-400/25 bg-sky-400/10 text-sky-300",
+  Evening: "border-violet-400/25 bg-violet-400/10 text-violet-300",
+  Night: "border-slate-400/25 bg-slate-400/10 text-slate-300",
+};
 
 function PriorityBadge({ priority }: { priority: string }) {
-  const styles: Record<string, { bg: string; color: string }> = {
-    High:   { bg: "#FEF2F2", color: "#B91C1C" },
-    Medium: { bg: "#FFFBEB", color: "#92400E" },
-    Low:    { bg: "#ECFDF5", color: "#065F46" },
-  };
-  const s = styles[priority] ?? { bg: "#F3F4F6", color: "#374151" };
   return (
-    <span style={{
-      fontSize: "10px", fontWeight: 700, padding: "2px 8px",
-      borderRadius: "99px", background: s.bg, color: s.color,
-      letterSpacing: "0.3px",
-    }}>
+    <span className={`${badgeBase} ${priorityStyles[priority] ?? badgeFallback}`}>
       {priority}
     </span>
   );
 }
 
-// ─── Period badge ─────────────────────────────────────────────────────────────
-
 function PeriodBadge({ period }: { period: string }) {
-  const styles: Record<string, { bg: string; color: string }> = {
-    Morning:   { bg: "#FFF7ED", color: "#C2410C" },
-    Afternoon: { bg: "#EFF6FF", color: "#1D4ED8" },
-    Evening:   { bg: "#F5F3FF", color: "#6D28D9" },
-    Night:     { bg: "#0F172A", color: "#94A3B8" },
-  };
-  const s = styles[period] ?? { bg: "#F3F4F6", color: "#374151" };
   return (
-    <span style={{
-      fontSize: "10px", fontWeight: 600, padding: "2px 8px",
-      borderRadius: "99px", background: s.bg, color: s.color,
-    }}>
+    <span className={`${badgeBase} ${periodStyles[period] ?? badgeFallback}`}>
       {period}
     </span>
   );
 }
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
+/* ------------------------------------------------------------------ */
+/* Progress bar                                                         */
+/* ------------------------------------------------------------------ */
 
-function ProgressBar({ percentage }: { percentage: number }) {
+function ProgressBar({
+  percentage,
+  className = "h-1.5",
+  delay = 0.5,
+}: {
+  percentage: number;
+  className?: string;
+  delay?: number;
+}) {
+  const pct = Math.max(0, Math.min(100, percentage));
   return (
-    <div style={{ height: "6px", background: "#F3F4F6", borderRadius: "99px", overflow: "hidden" }}>
+    <div
+      role="progressbar"
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      className={`overflow-hidden rounded-full bg-white/[0.08] ${className}`}
+    >
       <motion.div
+        className="h-full rounded-full bg-gradient-to-r from-[#d8bb84] to-[#f0dcae]"
         initial={{ width: 0 }}
-        animate={{ width: `${percentage}%` }}
-        transition={{ duration: 0.9, ease: [0.4, 0, 0.2, 1], delay: 0.2 }}
-        style={{
-          height: "100%", borderRadius: "99px",
-          background: "linear-gradient(90deg, #4F46E5, #7C3AED)",
-        }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: 0.9, ease: "easeOut", delay }}
       />
     </div>
   );
 }
 
-// ─── AI Chat Panel ────────────────────────────────────────────────────────────
+/* ------------------------------------------------------------------ */
+/* AI Chat Panel                                                        */
+/* ------------------------------------------------------------------ */
 
 interface ChatPanelProps {
   task: Task;
@@ -114,6 +138,15 @@ function ChatPanel({ task, plan, onClose }: ChatPanelProps) {
     inputRef.current?.focus();
   }, []);
 
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   // Kick off first Gemini call automatically
   useEffect(() => {
     async function startSession() {
@@ -138,19 +171,29 @@ function ChatPanel({ task, plan, onClose }: ChatPanelProps) {
         const data = await res.json();
         setMessages([{ role: "assistant", content: data.message }]);
       } catch {
-        setMessages([{ role: "assistant", content: "Hi! I'm having trouble connecting right now. Please try again in a moment." }]);
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              "Hi! I'm having trouble connecting right now. Please try again in a moment.",
+          },
+        ]);
       } finally {
         setLoading(false);
       }
     }
     void startSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task.id]);
 
   async function sendMessage() {
     const trimmed = draft.trim();
     if (!trimmed || loading) return;
 
-    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: trimmed }];
+    const nextMessages: ChatMessage[] = [
+      ...messages,
+      { role: "user", content: trimmed },
+    ];
     setMessages(nextMessages);
     setDraft("");
     setLoading(true);
@@ -175,82 +218,63 @@ function ChatPanel({ task, plan, onClose }: ChatPanelProps) {
       const data = await res.json();
       setMessages([...nextMessages, { role: "assistant", content: data.message }]);
     } catch {
-      setMessages([...nextMessages, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
+      setMessages([
+        ...nextMessages,
+        {
+          role: "assistant",
+          content: "Sorry, something went wrong. Please try again.",
+        },
+      ]);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void sendMessage();
     }
   }
 
+  const canSend = draft.trim().length > 0 && !loading;
+
   return (
-    <motion.div
+    <motion.aside
       initial={{ opacity: 0, x: 40 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 40 }}
-      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-      style={{
-        display: "flex", flexDirection: "column",
-        background: "#ffffff", border: "1px solid #E5E7EB",
-        borderRadius: "20px", overflow: "hidden",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
-        height: "100%",
-        position: "sticky",
-        top: "20px",
-      }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      aria-label="AI Help Studio"
+      className={`${card} fixed inset-x-3 bottom-3 z-50 flex h-[78vh] flex-col overflow-hidden border-[#c9a45c]/20 bg-[#0a1228] shadow-2xl shadow-black/50 lg:sticky lg:inset-auto lg:top-24 lg:z-auto lg:h-[calc(100vh-8rem)] lg:shadow-none`}
     >
-      {/* Chat header */}
-      <div style={{
-        padding: "16px 18px",
-        borderBottom: "1px solid #F3F4F6",
-        background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
-      }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{
-              width: "32px", height: "32px", borderRadius: "10px",
-              background: "rgba(255,255,255,0.2)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-            }}>
-              <Sparkles size={16} color="#ffffff" />
-            </div>
+      {/* Header */}
+      <div className="border-b border-white/[0.07] bg-gradient-to-br from-[#c9a45c]/[0.12] to-transparent px-5 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-xl border border-[#c9a45c]/40 bg-[#1a1d2b] text-[#e6c78f]">
+              <Sparkles className="size-4" />
+            </span>
             <div>
-              <p style={{ fontSize: "13px", fontWeight: 700, color: "#ffffff", lineHeight: 1.2 }}>
+              <p className="font-serif text-[16px] leading-tight font-medium text-white">
                 AI Help Studio
               </p>
-              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.7)", marginTop: "2px", lineHeight: 1.2 }}>
-                Powered by Gemini
-              </p>
+              <p className="mt-0.5 text-[11.5px] text-slate-400">Powered by Gemini</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            style={{
-              width: "28px", height: "28px", borderRadius: "8px",
-              background: "rgba(255,255,255,0.15)", border: "none",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", flexShrink: 0,
-            }}
+            aria-label="Close chat"
+            className={`flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/[0.07] hover:text-white ${focusRing}`}
           >
-            <X size={14} color="#ffffff" />
+            <X className="size-4" />
           </button>
         </div>
-        {/* Task chip */}
-        <div style={{
-          marginTop: "12px", padding: "8px 10px",
-          background: "rgba(255,255,255,0.12)", borderRadius: "10px",
-          border: "1px solid rgba(255,255,255,0.15)",
-        }}>
-          <p style={{ fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px" }}>
-            Helping with
-          </p>
-          <p style={{ fontSize: "12.5px", fontWeight: 600, color: "#ffffff", lineHeight: 1.3 }}>
+
+        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.05] px-3.5 py-2.5">
+          <p className="text-[11px] text-slate-400">Helping with</p>
+          <p className="mt-0.5 text-[13px] leading-snug font-medium text-white">
             {task.title}
           </p>
         </div>
@@ -259,12 +283,7 @@ function ChatPanel({ task, plan, onClose }: ChatPanelProps) {
       {/* Messages */}
       <div
         ref={scrollRef}
-        style={{
-          flex: 1, overflowY: "auto", padding: "16px",
-          display: "flex", flexDirection: "column", gap: "12px",
-          background: "#FAFAFA",
-          minHeight: 0,
-        }}
+        className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-5"
       >
         <AnimatePresence initial={false}>
           {messages.map((msg, idx) => (
@@ -272,63 +291,44 @@ function ChatPanel({ task, plan, onClose }: ChatPanelProps) {
               key={idx}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              style={{
-                display: "flex",
-                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-              }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               {msg.role === "assistant" && (
-                <div style={{
-                  width: "26px", height: "26px", borderRadius: "8px",
-                  background: "linear-gradient(135deg, #4F46E5, #7C3AED)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0, marginRight: "8px", marginTop: "2px",
-                }}>
-                  <Sparkles size={12} color="#fff" />
-                </div>
+                <span className="mt-0.5 mr-2.5 flex size-7 shrink-0 items-center justify-center rounded-lg border border-[#c9a45c]/30 bg-[#1a1d2b] text-[#e6c78f]">
+                  <Sparkles className="size-3.5" />
+                </span>
               )}
-              <div style={{
-                maxWidth: "82%",
-                padding: "10px 14px",
-                borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "4px 16px 16px 16px",
-                background: msg.role === "user" ? "#4F46E5" : "#ffffff",
-                color: msg.role === "user" ? "#ffffff" : "#111827",
-                fontSize: "13px", lineHeight: 1.6,
-                border: msg.role === "assistant" ? "1px solid #E5E7EB" : "none",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                whiteSpace: "pre-wrap",
-              }}>
+              <div
+                className={[
+                  "max-w-[82%] px-3.5 py-2.5 text-[13px] leading-[1.6] whitespace-pre-wrap",
+                  msg.role === "user"
+                    ? "rounded-2xl rounded-br-sm bg-gradient-to-r from-[#ecd5a5] to-[#c9a45c] font-medium text-[#1c1406]"
+                    : "rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.05] text-slate-100",
+                ].join(" ")}
+              >
                 {msg.content}
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
 
-        {/* Loading dots */}
         {loading && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            style={{ display: "flex", alignItems: "center", gap: "8px" }}
+            className="flex items-center gap-2.5"
           >
-            <div style={{
-              width: "26px", height: "26px", borderRadius: "8px",
-              background: "linear-gradient(135deg, #4F46E5, #7C3AED)",
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>
-              <Sparkles size={12} color="#fff" />
-            </div>
-            <div style={{
-              padding: "10px 14px", background: "#ffffff", borderRadius: "4px 16px 16px 16px",
-              border: "1px solid #E5E7EB", display: "flex", alignItems: "center", gap: "4px",
-            }}>
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-[#c9a45c]/30 bg-[#1a1d2b] text-[#e6c78f]">
+              <Sparkles className="size-3.5" />
+            </span>
+            <div className="flex items-center gap-1 rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.05] px-3.5 py-3">
               {[0, 1, 2].map((i) => (
-                <motion.div
+                <motion.span
                   key={i}
                   animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                  style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4F46E5" }}
+                  className="size-1.5 rounded-full bg-[#d9b77a]"
                 />
               ))}
             </div>
@@ -336,152 +336,142 @@ function ChatPanel({ task, plan, onClose }: ChatPanelProps) {
         )}
       </div>
 
-      {/* Input area */}
-      <div style={{
-        padding: "14px 16px",
-        borderTop: "1px solid #F3F4F6",
-        background: "#ffffff",
-      }}>
-        <div style={{
-          display: "flex", gap: "10px", alignItems: "flex-end",
-          background: "#F9FAFB", borderRadius: "14px",
-          border: "1px solid #E5E7EB", padding: "10px 12px",
-        }}>
+      {/* Input */}
+      <div className="border-t border-white/[0.07] px-4 py-4">
+        <div className="flex items-end gap-2.5 rounded-2xl border border-white/15 bg-white/[0.04] py-2.5 pr-2.5 pl-4 focus-within:border-[#d9b77a]/70">
           <textarea
             ref={inputRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type your reply... (Enter to send)"
+            placeholder="Type your reply..."
+            aria-label="Message Forge AI"
             rows={2}
-            style={{
-              flex: 1, resize: "none", border: "none", background: "transparent",
-              fontSize: "13px", color: "#111827", outline: "none",
-              lineHeight: 1.5, fontFamily: "inherit",
-            }}
+            className="min-w-0 flex-1 resize-none bg-transparent text-[13px] leading-[1.5] text-white outline-none placeholder:text-slate-500"
           />
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            type="button"
+            whileHover={canSend ? { scale: 1.06 } : undefined}
+            whileTap={canSend ? { scale: 0.94 } : undefined}
             onClick={() => void sendMessage()}
-            disabled={!draft.trim() || loading}
-            style={{
-              width: "34px", height: "34px", borderRadius: "10px", flexShrink: 0,
-              background: draft.trim() && !loading ? "#4F46E5" : "#E5E7EB",
-              border: "none", cursor: draft.trim() && !loading ? "pointer" : "default",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "background 0.15s",
-            }}
+            disabled={!canSend}
+            aria-label="Send message"
+            className={[
+              "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+              focusRing,
+              canSend
+                ? "bg-gradient-to-r from-[#ecd5a5] to-[#c9a45c] text-[#1c1406]"
+                : "bg-white/[0.08] text-slate-500",
+            ].join(" ")}
           >
-            <SendHorizonal size={14} color={draft.trim() && !loading ? "#ffffff" : "#9CA3AF"} />
+            <SendHorizontal className="size-4" />
           </motion.button>
         </div>
-        <p style={{ fontSize: "10.5px", color: "#9CA3AF", textAlign: "center", marginTop: "8px" }}>
+        <p className="mt-2.5 text-center text-[11px] text-slate-500">
           Shift+Enter for new line · Enter to send
         </p>
       </div>
-    </motion.div>
+    </motion.aside>
   );
 }
 
-// ─── Task Card ────────────────────────────────────────────────────────────────
+/* ------------------------------------------------------------------ */
+/* Task card                                                            */
+/* ------------------------------------------------------------------ */
 
 interface TaskCardProps {
   task: Task;
+  index: number;
   isCompleted: boolean;
   isActive: boolean;
   onToggle: (task: Task) => void;
   onAskAI: (task: Task) => void;
 }
 
-function TaskCard({ task, isCompleted, isActive, onToggle, onAskAI }: TaskCardProps) {
+function TaskCard({
+  task,
+  index,
+  isCompleted,
+  isActive,
+  onToggle,
+  onAskAI,
+}: TaskCardProps) {
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      style={{
-        padding: "16px 18px",
-        background: isCompleted ? "#FAFAFA" : "#ffffff",
-        border: isActive ? "1.5px solid #A5B4FC" : "1px solid #E5E7EB",
-        borderRadius: "14px",
-        opacity: isCompleted ? 0.7 : 1,
-        boxShadow: isActive ? "0 0 0 3px rgba(79,70,229,0.08)" : "0 1px 3px rgba(0,0,0,0.04)",
-        transition: "all 0.2s",
-      }}
+      variants={row}
+      custom={index}
+      className={[
+        "rounded-xl border p-4 transition-colors duration-200",
+        isActive
+          ? "border-[#c9a45c]/50 bg-[#c9a45c]/[0.06] ring-1 ring-[#c9a45c]/15"
+          : "border-white/[0.07] bg-white/[0.035] hover:bg-white/[0.05]",
+        isCompleted ? "opacity-60" : "",
+      ].join(" ")}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+      <div className="flex items-start gap-3.5">
         {/* Checkbox */}
         <button
+          type="button"
           onClick={() => onToggle(task)}
-          style={{
-            marginTop: "2px", flexShrink: 0, background: "none",
-            border: "none", cursor: "pointer", padding: 0,
-            color: isCompleted ? "#4F46E5" : "#D1D5DB",
-          }}
+          role="checkbox"
+          aria-checked={isCompleted}
+          aria-label={`Mark "${task.title}" as ${isCompleted ? "incomplete" : "complete"}`}
+          className={`mt-0.5 shrink-0 rounded-full transition-colors ${focusRing} ${
+            isCompleted ? "text-[#e0bf86]" : "text-slate-500 hover:text-slate-300"
+          }`}
         >
-          {isCompleted
-            ? <CheckCircle2 size={20} color="#4F46E5" />
-            : <Circle size={20} color="#D1D5DB" />
-          }
+          {isCompleted ? (
+            <CircleCheck className="size-5" />
+          ) : (
+            <Circle className="size-5" />
+          )}
         </button>
 
         {/* Content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{
-            fontSize: "14px", fontWeight: 600, color: isCompleted ? "#9CA3AF" : "#111827",
-            textDecoration: isCompleted ? "line-through" : "none",
-            lineHeight: 1.4, marginBottom: "6px",
-          }}>
+        <div className="min-w-0 flex-1">
+          <p
+            className={`text-[14px] leading-snug font-medium ${
+              isCompleted ? "text-slate-500 line-through" : "text-white"
+            }`}
+          >
             {task.title}
           </p>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: task.aiNote ? "8px" : "0" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#9CA3AF" }}>
-              <Clock size={11} />
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-1.5 text-[12px] text-slate-400">
+              <Clock className="size-3" />
               {task.time} · {task.duration}
             </span>
             <PeriodBadge period={task.period} />
             <PriorityBadge priority={task.priority} />
-            <span style={{
-              fontSize: "10px", fontWeight: 600, padding: "2px 8px",
-              borderRadius: "99px", background: "#F3F4F6", color: "#6B7280",
-            }}>
-              {task.taskType}
-            </span>
+            <span className={`${badgeBase} ${badgeFallback}`}>{task.taskType}</span>
           </div>
 
           {task.aiNote && (
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: "6px",
-              padding: "5px 10px", borderRadius: "8px",
-              background: "#EEF2FF", border: "1px solid #C7D2FE",
-            }}>
-              <Sparkles size={10} color="#4F46E5" />
-              <span style={{ fontSize: "11.5px", color: "#4F46E5", fontWeight: 500 }}>
-                {task.aiNote}
-              </span>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#c9a45c]/25 bg-[#c9a45c]/[0.07] px-2.5 py-1.5">
+              <Sparkles className="size-3 shrink-0 text-[#e6c78f]" />
+              <span className="text-[12px] text-[#f0d9a8]">{task.aiNote}</span>
             </div>
           )}
         </div>
 
-        {/* Ask AI button */}
+        {/* Ask AI */}
         {!isCompleted && (
           <motion.button
+            type="button"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             onClick={() => onAskAI(task)}
-            style={{
-              flexShrink: 0, display: "flex", alignItems: "center", gap: "6px",
-              padding: "7px 12px", borderRadius: "10px", cursor: "pointer",
-              background: isActive ? "#4F46E5" : "#EEF2FF",
-              border: isActive ? "none" : "1px solid #C7D2FE",
-              color: isActive ? "#ffffff" : "#4F46E5",
-              fontSize: "12px", fontWeight: 600,
-              transition: "all 0.15s",
-            }}
+            aria-pressed={isActive}
+            className={[
+              "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors",
+              focusRing,
+              isActive
+                ? "bg-gradient-to-r from-[#ecd5a5] to-[#c9a45c] text-[#1c1406]"
+                : "border border-[#c9a45c]/40 text-[#ecd5a5] hover:bg-[#c9a45c]/10",
+            ].join(" ")}
           >
-            <BrainCircuit size={13} />
+            <BrainCircuit className="size-3.5" />
             {isActive ? "Chatting" : "Ask AI"}
           </motion.button>
         )}
@@ -490,7 +480,9 @@ function TaskCard({ task, isCompleted, isActive, onToggle, onAskAI }: TaskCardPr
   );
 }
 
-// ─── Day Section ──────────────────────────────────────────────────────────────
+/* ------------------------------------------------------------------ */
+/* Day section                                                          */
+/* ------------------------------------------------------------------ */
 
 interface DaySectionProps {
   day: Plan["days"][0];
@@ -500,41 +492,38 @@ interface DaySectionProps {
   onAskAI: (task: Task) => void;
 }
 
-function DaySection({ day, taskState, activeTaskId, onToggle, onAskAI }: DaySectionProps) {
+function DaySection({
+  day,
+  taskState,
+  activeTaskId,
+  onToggle,
+  onAskAI,
+}: DaySectionProps) {
   const completed = day.items.filter((t) => taskState[t.id] ?? t.completed).length;
   const total = day.items.length;
+  const pct = total > 0 ? (completed / total) * 100 : 0;
 
   return (
-    <div style={{ marginBottom: "24px" }}>
-      {/* Day header */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: "12px",
-      }}>
+    <div className="border-t border-white/[0.06] pt-7 first:border-t-0 first:pt-0">
+      <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h3 style={{ fontSize: "15px", fontWeight: 700, color: "#111827" }}>{day.day}</h3>
-          <p style={{ fontSize: "12px", color: "#9CA3AF", marginTop: "1px" }}>{day.date}</p>
+          <h3 className="font-serif text-[16px] font-medium text-white">{day.day}</h3>
+          <p className="mt-0.5 text-[12px] text-slate-400">{day.date}</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ fontSize: "12px", color: "#6B7280", fontWeight: 500 }}>
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-slate-300">
             {completed}/{total}
           </span>
-          <div style={{ width: "60px", height: "4px", background: "#F3F4F6", borderRadius: "99px", overflow: "hidden" }}>
-            <div style={{
-              width: `${total > 0 ? (completed / total) * 100 : 0}%`,
-              height: "100%", background: "#4F46E5", borderRadius: "99px",
-              transition: "width 0.4s ease",
-            }} />
-          </div>
+          <ProgressBar percentage={pct} className="h-1 w-16" delay={0.4} />
         </div>
       </div>
 
-      {/* Task cards */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        {day.items.map((task) => (
+      <div className="flex flex-col gap-3">
+        {day.items.map((task, i) => (
           <TaskCard
             key={task.id}
             task={task}
+            index={i}
             isCompleted={taskState[task.id] ?? task.completed}
             isActive={activeTaskId === task.id}
             onToggle={onToggle}
@@ -546,229 +535,199 @@ function DaySection({ day, taskState, activeTaskId, onToggle, onAskAI }: DaySect
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+/* ------------------------------------------------------------------ */
+/* Page                                                                 */
+/* ------------------------------------------------------------------ */
 
 export default function PlanDetailPage() {
   const params = useParams<{ planId: string }>();
   const { plans, taskState, toggleTask } = useTaskContext();
-  const [plan, setPlan] = useState<Plan | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
-  useEffect(() => {
-    if (!params?.planId) return;
-    const found = plans.find((p) => p.id === params.planId) ?? null;
-    setPlan(found);
-  }, [params?.planId, plans]);
+  const plan = useMemo(
+    () => plans.find((p) => p.id === params?.planId) ?? null,
+    [plans, params?.planId],
+  );
 
-  const stats = useMemo(() => {
-    if (!plan) return null;
-    return getPlanStats(plan, taskState);
-  }, [plan, taskState]);
+  const stats = useMemo(
+    () => (plan ? getPlanStats(plan, taskState) : null),
+    [plan, taskState],
+  );
 
   function handleAskAI(task: Task) {
-    setActiveTask((prev) => prev?.id === task.id ? null : task);
+    setActiveTask((prev) => (prev?.id === task.id ? null : task));
   }
 
   function handleTaskToggle(task: Task) {
+    const wasCompleted = taskState[task.id] ?? task.completed;
     toggleTask(task.id);
-    // Close chat if task is completed
-    if (!(taskState[task.id] ?? task.completed) === false) {
-      if (activeTask?.id === task.id) setActiveTask(null);
-    }
+    // Close the chat when the task being discussed gets completed
+    if (!wasCompleted && activeTask?.id === task.id) setActiveTask(null);
   }
 
+  /* Loading */
   if (!plan) {
     return (
-      <div style={{ minHeight: "100vh", background: "#F7F6F3", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>
-          <p style={{ color: "#6B7280", fontSize: "14px" }}>Loading plan...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#070d1e]">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
+          <LoaderCircle className="size-6 animate-spin text-[#d9b77a]" />
+          <p className="text-[13px]">Loading plan...</p>
         </div>
       </div>
     );
   }
 
+  const completionPct = stats?.completionPercentage ?? 0;
+  const tiles = [
+    { icon: Timer, label: "Focus", value: plan.focusTime },
+    { icon: Coffee, label: "Breaks", value: plan.breakTime },
+    { icon: Calendar, label: "Est. done", value: plan.completionEstimate },
+    { icon: Target, label: "Remaining", value: `${stats?.remainingTasks ?? 0} tasks` },
+  ];
+
   return (
-    <div style={{ minHeight: "100vh", background: "#F7F6F3", color: "#111827" }}>
+    <>
+    <Sidebar/>
+    <MotionConfig reducedMotion="user">
+      <div className="relative isolate min-h-screen bg-[#070d1e] text-white lg:pl-[300px]">
+        {/* soft ambient glow */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_70%_45%_at_85%_-10%,rgba(90,125,230,0.12),transparent_70%)]"
+        />
 
-      {/* Top bar */}
-      <div style={{
-        position: "sticky", top: 0, zIndex: 50,
-        background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)",
-        borderBottom: "1px solid #E5E7EB", padding: "0 32px", height: "60px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <Link
-            href="/"
-            style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              fontSize: "13px", fontWeight: 600, color: "#4F46E5", textDecoration: "none",
-            }}
+        <motion.div variants={page} initial="hidden" animate="show">
+          {/* Top bar */}
+          <motion.header
+            variants={rise}
+            className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#070d1e]/80 backdrop-blur-md"
           >
-            <ChevronLeft size={16} />
-            Dashboard
-          </Link>
-          <div style={{ width: "1px", height: "16px", background: "#E5E7EB" }} />
-          <span style={{ fontSize: "14px", fontWeight: 700, color: "#111827" }}>
-            {plan.heading}
-          </span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ fontSize: "13px", color: "#6B7280", fontWeight: 500 }}>
-            {stats?.completedTasks ?? 0}/{stats?.totalTasks ?? 0} tasks
-          </div>
-          <div style={{
-            padding: "5px 14px", borderRadius: "99px",
-            background: "#EEF2FF", color: "#4F46E5",
-            fontSize: "12px", fontWeight: 700,
-          }}>
-            {stats?.completionPercentage ?? 0}% complete
-          </div>
-        </div>
-      </div>
-
-      {/* Page body */}
-      <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "32px 32px" }}>
-
-        {/* Plan header card */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          style={{
-            background: "#ffffff", border: "1px solid #E5E7EB",
-            borderRadius: "20px", padding: "28px 32px",
-            marginBottom: "28px", position: "relative", overflow: "hidden",
-          }}
-        >
-          {/* Accent bar */}
-          <div style={{
-            position: "absolute", top: 0, left: 0, right: 0, height: "3px",
-            background: "linear-gradient(90deg, #4F46E5, #7C3AED)",
-          }} />
-
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "24px", flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: "260px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                <span style={{
-                  fontSize: "11px", fontWeight: 700, padding: "3px 12px",
-                  borderRadius: "99px", background: "#EEF2FF", color: "#4F46E5",
-                  textTransform: "uppercase", letterSpacing: "0.5px",
-                }}>
-                  {plan.planType}
-                </span>
-                <span style={{
-                  fontSize: "11px", fontWeight: 600, padding: "3px 12px",
-                  borderRadius: "99px", background: "#F0FDF4", color: "#166534",
-                }}>
-                  Score: {plan.productivityScore}
+            <div className="flex h-[60px] items-center justify-between gap-4 pr-4 pl-16 sm:pr-8 lg:px-12">
+              <div className="flex min-w-0 items-center gap-4">
+                <span className="hidden truncate font-serif text-[15px] text-white sm:block">
+                  {plan.heading}
                 </span>
               </div>
-              <h1 style={{ fontSize: "24px", fontWeight: 800, color: "#111827", letterSpacing: "-0.5px", marginBottom: "8px" }}>
-                {plan.heading}
-              </h1>
-              <p style={{ fontSize: "14px", color: "#6B7280", lineHeight: 1.6, maxWidth: "520px" }}>
-                {plan.summary}
-              </p>
-            </div>
 
-            {/* Stats row */}
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              {[
-                { icon: <Timer size={15} />, label: "Focus", value: plan.focusTime },
-                { icon: <Coffee size={15} />, label: "Breaks", value: plan.breakTime },
-                { icon: <Calendar size={15} />, label: "Est. done", value: plan.completionEstimate },
-                { icon: <Target size={15} />, label: "Remaining", value: `${stats?.remainingTasks ?? 0} tasks` },
-              ].map((s) => (
-                <div key={s.label} style={{
-                  padding: "12px 16px", background: "#F9FAFB",
-                  border: "1px solid #F3F4F6", borderRadius: "14px",
-                  textAlign: "center", minWidth: "80px",
-                }}>
-                  <div style={{ color: "#4F46E5", display: "flex", justifyContent: "center", marginBottom: "4px" }}>
-                    {s.icon}
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="hidden text-[12.5px] text-slate-400 sm:block">
+                  {stats?.completedTasks ?? 0}/{stats?.totalTasks ?? 0} tasks
+                </span>
+                <span className="rounded-full border border-[#c9a45c]/50 bg-[#c9a45c]/10 px-3 py-1 text-[12px] font-medium text-[#f0d9a8]">
+                  {completionPct}% complete
+                </span>
+              </div>
+            </div>
+          </motion.header>
+
+          <div className="mx-auto flex max-w-[1360px] flex-col gap-8 px-4 pt-8 pb-14 sm:px-8 lg:px-12">
+            {/* Plan header */}
+            <motion.section variants={rise} className={`${card} relative p-6 sm:p-7`}>
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#c9a45c]/60 to-transparent"
+              />
+
+              <div className="flex flex-wrap items-start justify-between gap-8">
+                <div className="min-w-[260px] flex-1">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="rounded-full border border-[#c9a45c]/40 bg-[#c9a45c]/10 px-3 py-0.5 text-[11.5px] font-medium text-[#f0d9a8]">
+                      {plan.planType}
+                    </span>
+                    <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-0.5 text-[11.5px] font-medium text-emerald-300">
+                      Score: {plan.productivityScore}
+                    </span>
                   </div>
-                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#111827" }}>{s.value}</div>
-                  <div style={{ fontSize: "10px", color: "#9CA3AF", marginTop: "2px" }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Overall progress */}
-          <div style={{ marginTop: "24px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ fontSize: "13px", color: "#6B7280", fontWeight: 500 }}>
-                Overall progress — {stats?.completedTasks ?? 0} of {stats?.totalTasks ?? 0} tasks done
-              </span>
-              <span style={{ fontSize: "14px", fontWeight: 700, color: "#4F46E5" }}>
-                {stats?.completionPercentage ?? 0}%
-              </span>
-            </div>
-            <ProgressBar percentage={stats?.completionPercentage ?? 0} />
-          </div>
-        </motion.div>
-
-        {/* 2-column: Tasks + Chat */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: activeTask ? "1fr 420px" : "1fr",
-          gap: "24px",
-          alignItems: "start",
-          transition: "grid-template-columns 0.3s ease",
-        }}>
-
-          {/* Left — Task timeline */}
-          <div>
-            <div style={{
-              background: "#ffffff", border: "1px solid #E5E7EB",
-              borderRadius: "20px", padding: "24px 28px",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
-                <div>
-                  <h2 style={{ fontSize: "17px", fontWeight: 700, color: "#111827" }}>Plan Timeline</h2>
-                  <p style={{ fontSize: "13px", color: "#9CA3AF", marginTop: "3px" }}>
-                    Work through your tasks · click "Ask AI" for guided help on any task
+                  <h1 className="mt-4 font-serif text-[26px] leading-tight font-medium text-white sm:text-[30px]">
+                    {plan.heading}
+                  </h1>
+                  <p className="mt-2.5 max-w-[520px] text-[13.5px] leading-[1.65] text-slate-400">
+                    {plan.summary}
                   </p>
                 </div>
-                <div style={{
-                  padding: "5px 14px", background: "#F3F4F6",
-                  borderRadius: "99px", fontSize: "12px", fontWeight: 600, color: "#6B7280",
-                }}>
-                  {stats?.remainingTasks ?? 0} remaining
+
+                <div className="grid w-full grid-cols-2 gap-3 sm:w-auto sm:grid-cols-4">
+                  {tiles.map(({ icon: Icon, label, value }, i) => (
+                    <motion.div
+                      key={label}
+                      variants={row}
+                      custom={i}
+                      className="min-w-[96px] rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-3.5"
+                    >
+                      <Icon className="size-4 stroke-[1.6] text-[#d9b77a]" />
+                      <p className="mt-2.5 font-serif text-[16px] leading-none text-white">
+                        {value}
+                      </p>
+                      <p className="mt-1.5 text-[11.5px] text-slate-400">{label}</p>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
 
-              {plan.days.map((day) => (
-                <DaySection
-                  key={`${day.day}-${day.date}`}
-                  day={day}
-                  taskState={taskState}
-                  activeTaskId={activeTask?.id ?? null}
-                  onToggle={handleTaskToggle}
-                  onAskAI={handleAskAI}
-                />
-              ))}
+              <div className="mt-7">
+                <div className="mb-2.5 flex items-center justify-between gap-3">
+                  <span className="text-[12.5px] text-slate-400">
+                    Overall progress — {stats?.completedTasks ?? 0} of{" "}
+                    {stats?.totalTasks ?? 0} tasks done
+                  </span>
+                  <span className="font-serif text-[16px] text-white">
+                    {completionPct}%
+                  </span>
+                </div>
+                <ProgressBar percentage={completionPct} className="h-1.5" />
+              </div>
+            </motion.section>
+
+            {/* Timeline + chat */}
+            <div
+              className={`grid grid-cols-1 items-start gap-6 transition-[grid-template-columns] duration-300 ${
+                activeTask ? "lg:grid-cols-[minmax(0,1fr)_400px]" : "lg:grid-cols-[minmax(0,1fr)]"
+              }`}
+            >
+              <motion.section variants={rise} className={`${card} p-6 sm:p-7`}>
+                <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-serif text-[19px] font-medium text-white">
+                      Plan Timeline
+                    </h2>
+                    <p className="mt-1 text-[12.5px] text-slate-400">
+                      Work through your tasks · tap “Ask AI” for guided help on any task
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[12px] text-slate-300">
+                    {stats?.remainingTasks ?? 0} remaining
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-7">
+                  {plan.days.map((day) => (
+                    <DaySection
+                      key={`${day.day}-${day.date}`}
+                      day={day}
+                      taskState={taskState}
+                      activeTaskId={activeTask?.id ?? null}
+                      onToggle={handleTaskToggle}
+                      onAskAI={handleAskAI}
+                    />
+                  ))}
+                </div>
+              </motion.section>
+
+              <AnimatePresence mode="wait">
+                {activeTask && (
+                  <ChatPanel
+                    key={activeTask.id}
+                    task={activeTask}
+                    plan={plan}
+                    onClose={() => setActiveTask(null)}
+                  />
+                )}
+              </AnimatePresence>
             </div>
           </div>
-
-          {/* Right — Chat panel */}
-          <AnimatePresence>
-            {activeTask && (
-              <div style={{ height: "calc(100vh - 120px)", position: "sticky", top: "80px" }}>
-                <ChatPanel
-                  key={activeTask.id}
-                  task={activeTask}
-                  plan={plan}
-                  onClose={() => setActiveTask(null)}
-                />
-              </div>
-            )}
-          </AnimatePresence>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </MotionConfig>
+    </>
   );
 }

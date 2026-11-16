@@ -15,7 +15,6 @@ import {
   TrendingUp,
   RefreshCw,
 } from "lucide-react";
-import { Logo } from "@/components/layout/Navbar";
 import Image from "next/image";
 
 function FadeUp({
@@ -151,7 +150,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-gray-900 overflow-x-hidden">
       {/* ── NAV ── */}
       <header className="sticky top-0 z-50 h-[60px] px-6 flex items-center gap-4 bg-white backdrop-blur border-b border-gray-200">
-        <Logo />
+        
       </header>
 
       {/* ── HERO ── */}
