@@ -1,6 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
+import { CalendarCheck, Coffee, ListChecks, Target, type LucideIcon } from "lucide-react";
+import { card, row } from "@/components/styles/styles";
 
 interface PlanningSummaryProps {
   totalTasks: number;
@@ -11,33 +13,39 @@ interface PlanningSummaryProps {
 }
 
 function ScoreRing({ score }: { score: number }) {
-  const radius = 22;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-
-  const color = score >= 80 ? "#10B981" : score >= 60 ? "#F59E0B" : "#EF4444";
+  const value = Math.max(0, Math.min(100, score));
+  const low = value < 60;
 
   return (
-    <div className="relative w-14 h-14 flex items-center justify-center">
-      <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
-        <circle cx="28" cy="28" r={radius} fill="none" stroke="#F3F4F6" strokeWidth="4" />
+    <div
+      className="relative size-16"
+      role="img"
+      aria-label={`Productivity score ${value} out of 100`}
+    >
+      <svg viewBox="0 0 56 56" className="size-full -rotate-90">
+        <defs>
+          <linearGradient id="ps-ring" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#f0dcae" />
+            <stop offset="1" stopColor="#c9a45c" />
+          </linearGradient>
+        </defs>
+        <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
         <motion.circle
           cx="28"
           cy="28"
-          r={radius}
+          r="22"
           fill="none"
-          stroke={color}
+          stroke={low ? "#fb7185" : "url(#ps-ring)"}
           strokeWidth="4"
           strokeLinecap="round"
-          strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.2, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: value / 100 }}
+          transition={{ duration: 1.2, delay: 0.5, ease: "easeOut" }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[13px] font-bold text-[#111827]">{score}</span>
-        <span className="text-[8px] text-[#9CA3AF] font-medium -mt-0.5">/ 100</span>
+        <span className="font-serif text-[16px] leading-none text-white">{value}</span>
+        <span className="mt-0.5 text-[9px] text-slate-400">/ 100</span>
       </div>
     </div>
   );
@@ -50,51 +58,50 @@ export default function PlanningSummary({
   completionEstimate,
   productivityScore,
 }: PlanningSummaryProps) {
-  const stats = [
-    { label: "Total Blocks", value: String(totalTasks), icon: "📋", color: "#EEF2FF", textColor: "#4F46E5" },
-    { label: "Focus Time", value: focusTime, icon: "🎯", color: "#EFF6FF", textColor: "#2563EB" },
-    { label: "Break Time", value: breakTime, icon: "☕", color: "#FEF3C7", textColor: "#92400E" },
-    { label: "Done By", value: completionEstimate, icon: "✅", color: "#ECFDF5", textColor: "#065F46" },
+  const stats: { icon: LucideIcon; label: string; value: string }[] = [
+    { icon: ListChecks, label: "Total blocks", value: String(totalTasks) },
+    { icon: Target, label: "Focus time", value: focusTime },
+    { icon: Coffee, label: "Break time", value: breakTime },
+    { icon: CalendarCheck, label: "Done by", value: completionEstimate },
   ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+    <section className={`${card} p-6`}>
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="text-[14px] font-semibold text-[#111827]">Planning Summary</h3>
-          <p className="text-[11px] text-[#9CA3AF] mt-0.5">AI-optimized schedule analysis</p>
+          <h3 className="font-serif text-[17px] font-medium text-white">
+            Planning Summary
+          </h3>
+          <p className="mt-1 text-[12.5px] text-slate-400">
+            AI-optimized schedule analysis
+          </p>
         </div>
-        <div className="flex flex-col items-center gap-0.5">
+        <div className="flex flex-col items-center gap-1.5">
           <ScoreRing score={productivityScore} />
-          <span className="text-[10px] text-[#6B7280] font-medium">Productivity</span>
+          <span className="text-[11px] text-slate-400">Productivity</span>
         </div>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {stats.map((stat, i) => (
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        {stats.map(({ icon: Icon, label, value }, i) => (
           <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.7 + i * 0.07 }}
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
-            style={{ backgroundColor: stat.color }}
+            key={label}
+            variants={row}
+            custom={i}
+            className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-3.5"
           >
-            <span className="text-base">{stat.icon}</span>
-            <div>
-              <p className="text-[11px] text-[#6B7280] font-medium">{stat.label}</p>
-              <p className="text-[13px] font-bold" style={{ color: stat.textColor }}>{stat.value}</p>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#c9a45c]/10 text-[#d9b77a]">
+              <Icon className="size-[18px] stroke-[1.6]" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11.5px] text-slate-400">{label}</p>
+              <p className="mt-0.5 truncate font-serif text-[16px] leading-tight text-white">
+                {value}
+              </p>
             </div>
           </motion.div>
         ))}
       </div>
-    </motion.div>
+    </section>
   );
 }

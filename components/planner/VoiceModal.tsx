@@ -1,8 +1,391 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Mic, Square, Send, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "motion/react";
+import { LoaderCircle, Mic, RotateCcw, Send, Square, X } from "lucide-react";
+import { blobToBase64 } from "./utils";
+import { card, focusRing } from "@/components/styles/styles";
+
+type Phase = "starting" | "recording" | "processing" | "done" | "error";
+
+const BAR_COUNT = 24;
+const MAX_SECONDS = 120;
+const MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+
+const pickMime = () =>
+  typeof MediaRecorder === "undefined"
+    ? ""
+    : (MIME_CANDIDATES.find((t) => MediaRecorder.isTypeSupported(t)) ?? "");
+
+const formatTime = (s: number) =>
+  `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+/* ------------------------------------------------------------------ */
+/* Panel — mounts fresh on every open and starts recording right away   */
+/* ------------------------------------------------------------------ */
+
+interface PanelProps {
+  onClose: () => void;
+  onTranscript: (text: string) => void;
+}
+
+function VoicePanel({ onClose, onTranscript }: PanelProps) {
+  const [phase, setPhase] = useState<Phase>("starting");
+  const [transcript, setTranscript] = useState("");
+  const [error, setError] = useState("");
+  const [seconds, setSeconds] = useState(0);
+
+  const runRef = useRef(0); // invalidates stale async work (retry / close / StrictMode)
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const rafRef = useRef(0);
+  const timerRef = useRef(0);
+  const maxRef = useRef(0);
+  const barsRef = useRef<(HTMLSpanElement | null)[]>([]);
+
+  /** Stop mic, meter and timers (leaves the recorder so it can flush its last chunk) */
+  function stopCapture() {
+    cancelAnimationFrame(rafRef.current);
+    window.clearInterval(timerRef.current);
+    window.clearTimeout(maxRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    void audioCtxRef.current?.close();
+    audioCtxRef.current = null;
+  }
+
+  /** Full teardown, discarding any recording in progress */
+  function release() {
+    const rec = recorderRef.current;
+    if (rec && rec.state !== "inactive") {
+      rec.onstop = null;
+      rec.stop();
+    }
+    recorderRef.current = null;
+    stopCapture();
+  }
+
+  function fail(message: string) {
+    setError(message);
+    setPhase("error");
+  }
+
+  async function start() {
+    const run = ++runRef.current;
+    release();
+    setPhase("starting");
+    setError("");
+    setTranscript("");
+    setSeconds(0);
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      fail("Voice input isn’t supported in this browser.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (run !== runRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      streamRef.current = stream;
+
+      const mime = pickMime();
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => void transcribe(run, recorder.mimeType || mime);
+      recorder.start(250);
+      recorderRef.current = recorder;
+
+      // Live level meter — drives the bars directly (no React re-renders)
+      const ctx = new AudioContext();
+      audioCtxRef.current = ctx;
+      void ctx.resume();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 64;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        barsRef.current.forEach((el, i) => {
+          if (!el) return;
+          const level = data[Math.floor((i * data.length) / BAR_COUNT)] / 255;
+          el.style.transform = `scaleY(${0.12 + level * 0.88})`;
+        });
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      tick();
+
+      timerRef.current = window.setInterval(() => setSeconds((s) => s + 1), 1000);
+      maxRef.current = window.setTimeout(stop, MAX_SECONDS * 1000);
+      setPhase("recording");
+    } catch (err) {
+      if (run !== runRef.current) return;
+      fail(
+        err instanceof DOMException && err.name === "NotAllowedError"
+          ? "Microphone access was blocked. Allow it in your browser settings and try again."
+          : "Couldn’t start recording. Check your microphone and try again.",
+      );
+    }
+  }
+
+  function stop() {
+    const rec = recorderRef.current;
+    if (!rec || rec.state === "inactive") return;
+    setPhase("processing");
+    rec.stop();
+    stopCapture();
+  }
+
+  async function transcribe(run: number, mime: string) {
+    try {
+      const type = mime || "audio/webm";
+      const blob = new Blob(chunksRef.current, { type });
+      if (!blob.size) throw new Error("empty recording");
+
+      const res = await fetch("/api/speech-to-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audioBase64: await blobToBase64(blob),
+          mimeType: type.split(";")[0],
+        }),
+      });
+      const data = await res.json();
+      if (run !== runRef.current) return;
+
+      if (data.transcript) {
+        setTranscript(data.transcript);
+        setPhase("done");
+      } else {
+        fail(data.error ?? "We couldn’t make out any speech. Please try again.");
+      }
+    } catch {
+      if (run === runRef.current) fail("Something went wrong while transcribing. Please try again.");
+    }
+  }
+
+  // Start on open, clean up on close
+  useEffect(() => {
+    void start();
+    return () => {
+      runRef.current++;
+      release();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Escape closes
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  function confirmTranscript() {
+    const text = transcript.trim();
+    if (!text) return;
+    onTranscript(text);
+    onClose();
+  }
+
+  const recording = phase === "recording";
+  const busy = phase === "starting" || phase === "processing";
+
+  return createPortal(
+    <motion.div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      />
+
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Voice input"
+        initial={{ opacity: 0, y: 16, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className={`${card} relative w-full max-w-[420px] overflow-hidden bg-[#0a1228] shadow-2xl shadow-black/50`}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-xl border border-[#c9a45c]/40 bg-[#1a1d2b] text-[#e6c78f]">
+              <Mic className="size-4" />
+            </span>
+            <div>
+              <p className="font-serif text-[16px] leading-tight font-medium text-white">
+                Voice input
+              </p>
+              <p className="mt-0.5 text-[11.5px] text-slate-400">
+                Powered by Google Speech-to-Text
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className={`flex size-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/[0.07] hover:text-white ${focusRing}`}
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-8">
+          {phase === "done" ? (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <label
+                htmlFor="voice-transcript"
+                className="text-[12px] text-slate-400"
+              >
+                Transcript — edit if needed
+              </label>
+              <textarea
+                id="voice-transcript"
+                value={transcript}
+                onChange={(e) => setTranscript(e.target.value)}
+                rows={5}
+                autoFocus
+                className="mt-2 w-full resize-none rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-[13.5px] leading-[1.6] text-white outline-none focus:border-[#d9b77a]/70"
+              />
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => void start()}
+                  className={`flex h-11 items-center gap-2 rounded-full border border-white/15 px-5 text-[13px] font-medium text-slate-200 transition-colors hover:bg-white/[0.06] hover:text-white ${focusRing}`}
+                >
+                  <RotateCcw className="size-3.5" />
+                  Re-record
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmTranscript}
+                  disabled={!transcript.trim()}
+                  className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#ecd5a5] via-[#e0bf86] to-[#c9a45c] text-[13.5px] font-semibold text-[#1c1406] transition-[filter] hover:brightness-110 disabled:opacity-40 ${focusRing}`}
+                >
+                  <Send className="size-3.5" />
+                  Use this text
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <div className="flex flex-col items-center">
+              {/* Orb */}
+              <div className="relative flex size-24 items-center justify-center">
+                {recording &&
+                  [0, 1].map((i) => (
+                    <motion.span
+                      key={i}
+                      aria-hidden="true"
+                      className="absolute inset-0 rounded-full border border-[#d9b77a]/50"
+                      initial={{ opacity: 0.5, scale: 1 }}
+                      animate={{ opacity: 0, scale: 1.7 }}
+                      transition={{
+                        duration: 1.8,
+                        repeat: Infinity,
+                        delay: i * 0.9,
+                        ease: "easeOut",
+                      }}
+                    />
+                  ))}
+                <motion.button
+                  type="button"
+                  onClick={recording ? stop : phase === "error" ? () => void start() : undefined}
+                  disabled={busy}
+                  whileHover={!busy ? { scale: 1.05 } : undefined}
+                  whileTap={!busy ? { scale: 0.95 } : undefined}
+                  aria-label={
+                    recording ? "Stop recording" : phase === "error" ? "Try again" : "Please wait"
+                  }
+                  className={`relative flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-[#ecd5a5] to-[#c9a45c] text-[#1c1406] shadow-[0_8px_28px_rgba(201,164,92,0.3)] disabled:opacity-70 ${focusRing}`}
+                >
+                  {busy ? (
+                    <LoaderCircle className="size-7 animate-spin" />
+                  ) : recording ? (
+                    <Square className="size-6 fill-current" />
+                  ) : (
+                    <RotateCcw className="size-6" />
+                  )}
+                </motion.button>
+              </div>
+
+              {/* Level meter */}
+              <div
+                aria-hidden="true"
+                className={`mt-6 flex h-10 items-center justify-center gap-[3px] transition-opacity ${
+                  recording ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {Array.from({ length: BAR_COUNT }, (_, i) => (
+                  <span
+                    key={i}
+                    ref={(el) => {
+                      barsRef.current[i] = el;
+                    }}
+                    className="h-full w-[3px] origin-center rounded-full bg-[#d9b77a] transition-transform duration-75"
+                    style={{ transform: "scaleY(0.12)" }}
+                  />
+                ))}
+              </div>
+
+              {/* Status */}
+              <div role="status" aria-live="polite" className="mt-3 text-center">
+                {phase === "starting" && (
+                  <p className="text-[13px] text-slate-300">Waiting for your microphone…</p>
+                )}
+                {recording && (
+                  <>
+                    <p className="font-serif text-[26px] leading-none text-white tabular-nums">
+                      {formatTime(seconds)}
+                    </p>
+                    <p className="mt-2 text-[12.5px] text-slate-400">
+                      Listening… tap the button to finish
+                    </p>
+                  </>
+                )}
+                {phase === "processing" && (
+                  <p className="text-[13px] text-[#ecd5a5]">Transcribing your audio…</p>
+                )}
+                {phase === "error" && (
+                  <p className="max-w-[300px] text-[13px] leading-relaxed text-rose-300">
+                    {error}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Public component                                                     */
+/* ------------------------------------------------------------------ */
 
 interface VoiceModalProps {
   isOpen: boolean;
@@ -10,386 +393,10 @@ interface VoiceModalProps {
   onTranscript: (text: string) => void;
 }
 
-type RecordState = "idle" | "recording" | "processing" | "done" | "error";
-
 export default function VoiceModal({ isOpen, onClose, onTranscript }: VoiceModalProps) {
-  const [state, setState] = useState<RecordState>("idle");
-  const [transcript, setTranscript] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [seconds, setSeconds] = useState(0);
-  const [bars, setBars] = useState<number[]>(Array(20).fill(4));
-
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const animRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  // Reset when opened
-  useEffect(() => {
-    if (isOpen) {
-      setState("idle");
-      setTranscript("");
-      setErrorMsg("");
-      setSeconds(0);
-    }
-    return () => cleanup();
-  }, [isOpen]);
-
-  function cleanup() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (animRef.current) clearInterval(animRef.current);
-    if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-    mediaRef.current = null;
-    chunksRef.current = [];
-  }
-
-  function startWaveAnimation() {
-    animRef.current = setInterval(() => {
-      setBars(Array(20).fill(0).map(() => Math.random() * 36 + 4));
-    }, 80);
-  }
-
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      mediaRef.current = recorder;
-      chunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = () => void processAudio();
-
-      recorder.start(100);
-      setState("recording");
-      setSeconds(0);
-
-      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
-      startWaveAnimation();
-    } catch {
-      setErrorMsg("Microphone access denied. Please allow microphone permissions.");
-      setState("error");
-    }
-  }
-
-  function stopRecording() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (animRef.current) clearInterval(animRef.current);
-    setBars(Array(20).fill(4));
-    mediaRef.current?.stop();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    setState("processing");
-  }
-
-  async function processAudio() {
-    try {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-
-      // Convert to base64
-      const arrayBuffer = await blob.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = "";
-      bytes.forEach((b) => (binary += String.fromCharCode(b)));
-      const audioBase64 = btoa(binary);
-
-      const res = await fetch("/api/speech-to-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ audioBase64, mimeType: "audio/webm" }),
-      });
-
-      const data = await res.json();
-
-      if (data.transcript) {
-        setTranscript(data.transcript);
-        setState("done");
-      } else {
-        setErrorMsg(data.error ?? "Could not transcribe audio. Please try again.");
-        setState("error");
-      }
-    } catch {
-      setErrorMsg("Something went wrong during processing.");
-      setState("error");
-    }
-  }
-
-  function handleUseTranscript() {
-    if (transcript) {
-      onTranscript(transcript);
-      onClose();
-    }
-  }
-
-  function handleRetry() {
-    setTranscript("");
-    setErrorMsg("");
-    setSeconds(0);
-    setState("idle");
-  }
-
-  const formatTime = (s: number) =>
-    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-
   return (
     <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            style={{
-              position: "fixed", inset: 0, zIndex: 100,
-              background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)",
-            }}
-          />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 20 }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            style={{
-              position: "fixed", top: "50%", left: "50%",
-              transform: "translate(-50%, -50%)",
-              zIndex: 101, width: "460px", maxWidth: "calc(100vw - 32px)",
-              background: "#ffffff", borderRadius: "24px",
-              boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-              overflow: "hidden",
-            }}
-          >
-            {/* Header */}
-            <div style={{
-              padding: "20px 24px 16px",
-              borderBottom: "1px solid #F3F4F6",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{
-                  width: "34px", height: "34px", borderRadius: "10px",
-                  background: "linear-gradient(135deg, #4F46E5, #7C3AED)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <Mic size={16} color="#fff" />
-                </div>
-                <div>
-                  <p style={{ fontSize: "14px", fontWeight: 700, color: "#111827" }}>Voice Input</p>
-                  <p style={{ fontSize: "11px", color: "#9CA3AF" }}>Powered by Google Speech-to-Text</p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                style={{
-                  width: "30px", height: "30px", borderRadius: "8px",
-                  background: "#F9FAFB", border: "1px solid #E5E7EB",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer",
-                }}
-              >
-                <X size={14} color="#6B7280" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div style={{ padding: "28px 24px" }}>
-
-              {/* Waveform / status area */}
-              <div style={{
-                height: "120px", borderRadius: "16px",
-                background: state === "recording" ? "#F5F3FF" : "#F9FAFB",
-                border: `1.5px solid ${state === "recording" ? "#C4B5FD" : "#E5E7EB"}`,
-                display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center", gap: "12px",
-                marginBottom: "24px", transition: "all 0.3s",
-                position: "relative", overflow: "hidden",
-              }}>
-                {state === "idle" && (
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "28px", marginBottom: "6px" }}>🎙️</div>
-                    <p style={{ fontSize: "13px", color: "#6B7280", fontWeight: 500 }}>
-                      Click record to start speaking
-                    </p>
-                    <p style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "3px" }}>
-                      Describe your goals out loud
-                    </p>
-                  </div>
-                )}
-
-                {state === "recording" && (
-                  <>
-                    {/* Timer */}
-                    <p style={{ fontSize: "22px", fontWeight: 700, color: "#4F46E5", fontVariantNumeric: "tabular-nums" }}>
-                      {formatTime(seconds)}
-                    </p>
-                    {/* Waveform bars */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "3px", height: "40px" }}>
-                      {bars.map((h, i) => (
-                        <motion.div
-                          key={i}
-                          animate={{ height: `${h}px` }}
-                          transition={{ duration: 0.08 }}
-                          style={{
-                            width: "3px", borderRadius: "99px",
-                            background: `rgba(79,70,229,${0.4 + (h / 40) * 0.6})`,
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <p style={{ fontSize: "11px", color: "#7C3AED", fontWeight: 600 }}>
-                      Listening...
-                    </p>
-                  </>
-                )}
-
-                {state === "processing" && (
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginBottom: "10px" }}>
-                      {[0, 1, 2].map((i) => (
-                        <motion.div
-                          key={i}
-                          animate={{ y: [0, -8, 0] }}
-                          transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                          style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4F46E5" }}
-                        />
-                      ))}
-                    </div>
-                    <p style={{ fontSize: "13px", color: "#4F46E5", fontWeight: 600 }}>Transcribing audio...</p>
-                    <p style={{ fontSize: "11px", color: "#9CA3AF", marginTop: "3px" }}>This takes a moment</p>
-                  </div>
-                )}
-
-                {state === "done" && (
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "28px", marginBottom: "6px" }}>✅</div>
-                    <p style={{ fontSize: "13px", color: "#059669", fontWeight: 600 }}>Transcription complete!</p>
-                  </div>
-                )}
-
-                {state === "error" && (
-                  <div style={{ textAlign: "center", padding: "0 20px" }}>
-                    <div style={{ fontSize: "28px", marginBottom: "6px" }}>⚠️</div>
-                    <p style={{ fontSize: "12px", color: "#DC2626", fontWeight: 500 }}>{errorMsg}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Transcript preview */}
-              <AnimatePresence>
-                {state === "done" && transcript && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{
-                      marginBottom: "20px", padding: "14px 16px",
-                      background: "#F0FDF4", border: "1px solid #A7F3D0",
-                      borderRadius: "12px",
-                    }}
-                  >
-                    <p style={{ fontSize: "11px", fontWeight: 700, color: "#059669", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                      Transcript
-                    </p>
-                    <p style={{ fontSize: "13.5px", color: "#111827", lineHeight: 1.6 }}>
-                      {transcript}
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Action buttons */}
-              <div style={{ display: "flex", gap: "10px" }}>
-                {state === "idle" && (
-                  <button
-                    onClick={startRecording}
-                    style={{
-                      flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                      gap: "8px", padding: "13px", borderRadius: "14px",
-                      background: "linear-gradient(135deg, #4F46E5, #7C3AED)",
-                      color: "#fff", border: "none", cursor: "pointer",
-                      fontSize: "14px", fontWeight: 700,
-                      boxShadow: "0 4px 16px rgba(79,70,229,0.3)",
-                    }}
-                  >
-                    <Mic size={16} />
-                    Start Recording
-                  </button>
-                )}
-
-                {state === "recording" && (
-                  <motion.button
-                    animate={{ scale: [1, 1.03, 1] }}
-                    transition={{ duration: 1.2, repeat: Infinity }}
-                    onClick={stopRecording}
-                    style={{
-                      flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                      gap: "8px", padding: "13px", borderRadius: "14px",
-                      background: "#FEF2F2", color: "#DC2626",
-                      border: "1.5px solid #FECACA", cursor: "pointer",
-                      fontSize: "14px", fontWeight: 700,
-                    }}
-                  >
-                    <Square size={14} fill="#DC2626" />
-                    Stop Recording
-                  </motion.button>
-                )}
-
-                {state === "done" && (
-                  <>
-                    <button
-                      onClick={handleRetry}
-                      style={{
-                        display: "flex", alignItems: "center", gap: "6px",
-                        padding: "12px 18px", borderRadius: "12px",
-                        background: "#F9FAFB", color: "#6B7280",
-                        border: "1px solid #E5E7EB", cursor: "pointer",
-                        fontSize: "13px", fontWeight: 600,
-                      }}
-                    >
-                      <RotateCcw size={14} />
-                      Retry
-                    </button>
-                    <button
-                      onClick={handleUseTranscript}
-                      style={{
-                        flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                        gap: "8px", padding: "13px", borderRadius: "14px",
-                        background: "#4F46E5", color: "#fff",
-                        border: "none", cursor: "pointer",
-                        fontSize: "14px", fontWeight: 700,
-                      }}
-                    >
-                      <Send size={14} />
-                      Use This Text
-                    </button>
-                  </>
-                )}
-
-                {state === "error" && (
-                  <button
-                    onClick={handleRetry}
-                    style={{
-                      flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                      gap: "8px", padding: "13px", borderRadius: "14px",
-                      background: "#4F46E5", color: "#fff",
-                      border: "none", cursor: "pointer",
-                      fontSize: "14px", fontWeight: 700,
-                    }}
-                  >
-                    <RotateCcw size={14} />
-                    Try Again
-                  </button>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        </>
-      )}
+      {isOpen && <VoicePanel key="voice" onClose={onClose} onTranscript={onTranscript} />}
     </AnimatePresence>
   );
 }

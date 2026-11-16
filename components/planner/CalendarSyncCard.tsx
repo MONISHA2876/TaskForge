@@ -1,145 +1,148 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowRight, Check, Info, LoaderCircle, Save } from "lucide-react";
 import { savePlan } from "@/lib/firestore";
 import { useAuth } from "@/lib/auth-context";
+import type { GeneratedPlan } from "@/lib/mockPlanner";
+import { card, focusRing, linkGold } from "@/components/styles/styles";
 
-interface SavePlanCardProps {
-  plan: any;
-}
+type Status = "idle" | "saving" | "saved" | "error";
 
-export default function SavePlanCard({ plan }: SavePlanCardProps) {
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+export default function SavePlanCard({ plan }: { plan: GeneratedPlan }) {
   const { user } = useAuth();
+  const [status, setStatus] = useState<Status>("idle");
+  const [error, setError] = useState("");
 
   async function handleSave() {
-    if (saving || saved) return;
-
-    setSaving(true);
+    if (status === "saving" || status === "saved") return;
 
     if (!user) {
-      alert("Please sign in to save your plan.");
-      setSaving(false);
+      setError("Please sign in to save your plan.");
+      setStatus("error");
       return;
     }
 
-    const res = await savePlan(plan, user.uid);
+    setStatus("saving");
+    setError("");
 
-    setSaving(false);
-
-    if (res.success) {
-      setSaved(true);
-    } else {
-      alert("Failed to save plan.");
+    try {
+      const res = await savePlan(plan, user.uid);
+      if (res.success) {
+        setStatus("saved");
+      } else {
+        throw new Error("save failed");
+      }
+    } catch {
+      setError("We couldn’t save your plan. Please try again.");
+      setStatus("error");
     }
   }
 
+  const saving = status === "saving";
+  const saved = status === "saved";
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.45,
-        delay: 0.75,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-      className="rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#EEF2FF] flex items-center justify-center">
-            💾
-          </div>
-
+    <section className={`${card} p-5`}>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-[#c9a45c]/40 bg-[#1a1d2b] text-[#e6c78f]">
+            <Save className="size-[18px] stroke-[1.7]" />
+          </span>
           <div>
-            <p className="text-[13px] font-semibold text-[#111827]">
-              Save Plan
+            <p className="font-serif text-[16px] leading-tight font-medium text-white">
+              Save plan
             </p>
-
-            <p className="text-[11px] text-[#9CA3AF]">
+            <p className="mt-1 text-[12.5px] text-slate-400">
               {saved
                 ? "Plan saved successfully."
-                : "Store this AI generated plan securely."}
+                : "Store this AI-generated plan securely."}
             </p>
           </div>
         </div>
 
         <motion.button
-          whileHover={!saved && !saving ? { scale: 1.04 } : {}}
-          whileTap={!saved && !saving ? { scale: 0.97 } : {}}
-          onClick={handleSave}
+          type="button"
+          whileHover={!saving && !saved ? { scale: 1.03 } : undefined}
+          whileTap={!saving && !saved ? { scale: 0.97 } : undefined}
+          onClick={() => void handleSave()}
           disabled={saving || saved}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all duration-200 min-w-[110px] justify-center ${
+          className={[
+            "flex h-10 min-w-[116px] items-center justify-center gap-2 rounded-full px-5 text-[13px] font-semibold transition-[filter,background-color]",
+            focusRing,
             saved
-              ? "bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]"
+              ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
               : saving
-                ? "bg-[#F5F3FF] text-[#6B7280] border border-[#E5E7EB]"
-                : "bg-[#4F46E5] text-white hover:bg-[#4338CA]"
-          }`}
+                ? "bg-white/[0.08] text-slate-300"
+                : "bg-gradient-to-r from-[#ecd5a5] via-[#e0bf86] to-[#c9a45c] text-[#1c1406] hover:brightness-110",
+          ].join(" ")}
         >
-          <AnimatePresence mode="wait">
-            {saving ? (
-              <motion.div
-                key="saving"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex items-center gap-2"
-              >
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 1,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
-                >
-                  ⏳
-                </motion.div>
-                Saving...
-              </motion.div>
-            ) : saved ? (
-              <motion.div
-                key="saved"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-2"
-              >
-                ✅ Saved
-              </motion.div>
-            ) : (
-              <motion.div
-                key="idle"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex items-center gap-2"
-              >
-                💾 Save
-              </motion.div>
-            )}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={status === "error" ? "idle" : status}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15 }}
+              className="flex items-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <LoaderCircle className="size-4 animate-spin" />
+                  Saving…
+                </>
+              ) : saved ? (
+                <>
+                  <Check className="size-4" />
+                  Saved
+                </>
+              ) : (
+                <>
+                  <Save className="size-4" />
+                  {status === "error" ? "Try again" : "Save"}
+                </>
+              )}
+            </motion.span>
           </AnimatePresence>
         </motion.button>
       </div>
 
-      <AnimatePresence>
-        {saved && (
-          <motion.div
+      <AnimatePresence initial={false}>
+        {status === "error" && (
+          <motion.p
+            key="error"
+            role="alert"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden mt-4"
+            className="mt-4 flex items-center gap-2 overflow-hidden rounded-xl border border-rose-400/25 bg-rose-400/10 px-3.5 py-2.5 text-[12.5px] text-rose-200"
           >
-            <div className="rounded-xl border border-[#A7F3D0] bg-[#ECFDF5] px-3 py-2">
-              <p className="text-[11px] font-medium text-[#059669]">
-                🎉 Your AI plan has been saved successfully. You will be able to
-                access it later from the MY PLANS section.
+            <Info className="size-4 shrink-0" />
+            {error}
+          </motion.p>
+        )}
+
+        {saved && (
+          <motion.div
+            key="saved"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3.5 py-2.5">
+              <p className="text-[12.5px] text-emerald-200">
+                Your plan is saved. You can open it any time from My Plans.
               </p>
+              <Link href="/plans" className={linkGold}>
+                View my plans <ArrowRight className="size-3" />
+              </Link>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </section>
   );
 }

@@ -1,7 +1,12 @@
-import Sidebar from "@/components/layout/SideBar";
+import Calendar from "@/components/Calendar";
 
-export default function Calendar() {
+export default function CalendarPage() {
     return(
-        <Sidebar />
+        <>
+            {/* <Sidebar /> */}
+            <div className="min-h-screen w-screen lg:pl-['300px']"> 
+                <Calendar />
+            </div>
+        </>
     )
 }

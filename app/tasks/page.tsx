@@ -4,7 +4,7 @@ import { motion, MotionConfig } from "motion/react";
 import Sidebar from "@/components/layout/SideBar";
 import UpcomingTasks from "@/components/tasks/UpcomingTasks";
 import MissedTasks from "@/components/tasks/MissedTasks";
-import { page } from "@/components/styles/styles"; // ← adjust path to your styles.ts
+import { page } from "@/components/styles/styles";
 
 export default function Tasks() {
   return (

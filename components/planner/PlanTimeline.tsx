@@ -1,6 +1,28 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
+import {
+  BookOpen,
+  Briefcase,
+  CircleCheck,
+  Code,
+  Coffee,
+  Dumbbell,
+  FileText,
+  FlaskConical,
+  GraduationCap,
+  Heart,
+  PenLine,
+  Pencil,
+  Repeat,
+  Rocket,
+  ShoppingCart,
+  Smile,
+  Sparkles,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { row } from "@/components/styles/styles";
 
 export interface TimelineItem {
   id: string;
@@ -24,273 +46,149 @@ interface PlanTimelineProps {
   days: TimelineDay[];
 }
 
-const PERIOD_COLORS: Record<
-  TimelineItem["period"],
-  {
-    dot: string;
-    label: string;
-  }
-> = {
-  Morning: {
-    dot: "bg-[#FDE68A]",
-    label: "text-[#92400E]",
-  },
-  Afternoon: {
-    dot: "bg-[#BFDBFE]",
-    label: "text-[#1E40AF]",
-  },
-  Evening: {
-    dot: "bg-[#C7D2FE]",
-    label: "text-[#3730A3]",
-  },
-  Night: {
-    dot: "bg-[#A7F3D0]",
-    label: "text-[#065F46]",
-  },
+/* ------------------------------------------------------------------ */
+/* Styling maps                                                         */
+/* ------------------------------------------------------------------ */
+
+const TASK_STYLES: Record<string, { icon: LucideIcon; color: string }> = {
+  study: { icon: GraduationCap, color: "#6366F1" },
+  revision: { icon: Repeat, color: "#F59E0B" },
+  practice: { icon: Pencil, color: "#10B981" },
+  assignment: { icon: FileText, color: "#EC4899" },
+  project: { icon: Rocket, color: "#8B5CF6" },
+  coding: { icon: Code, color: "#3B82F6" },
+  meeting: { icon: Users, color: "#0EA5E9" },
+  reading: { icon: BookOpen, color: "#14B8A6" },
+  research: { icon: FlaskConical, color: "#A78BFA" },
+  writing: { icon: PenLine, color: "#F97316" },
+  exercise: { icon: Dumbbell, color: "#EF4444" },
+  work: { icon: Briefcase, color: "#818CF8" },
+  break: { icon: Coffee, color: "#9CA3AF" },
+  personal: { icon: Smile, color: "#06B6D4" },
+  errands: { icon: ShoppingCart, color: "#84CC16" },
+  health: { icon: Heart, color: "#F43F5E" },
+  other: { icon: CircleCheck, color: "#94A3B8" },
 };
 
-const TASK_STYLES = {
-  study: {
-    icon: "📚",
-    color: "#4F46E5",
-    textColor: "#3730A3",
-  },
+const badge = "rounded-full border px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap";
 
-  revision: {
-    icon: "🔁",
-    color: "#F59E0B",
-    textColor: "#92400E",
-  },
+const PRIORITY: Record<TimelineItem["priority"], string> = {
+  High: "border-rose-400/25 bg-rose-400/10 text-rose-300",
+  Medium: "border-amber-400/25 bg-amber-400/10 text-amber-300",
+  Low: "border-emerald-400/25 bg-emerald-400/10 text-emerald-300",
+};
 
-  practice: {
-    icon: "✏️",
-    color: "#10B981",
-    textColor: "#065F46",
-  },
+const PERIOD: Record<TimelineItem["period"], string> = {
+  Morning: "border-orange-400/25 bg-orange-400/10 text-orange-300",
+  Afternoon: "border-sky-400/25 bg-sky-400/10 text-sky-300",
+  Evening: "border-violet-400/25 bg-violet-400/10 text-violet-300",
+  Night: "border-slate-400/25 bg-slate-400/10 text-slate-300",
+};
 
-  assignment: {
-    icon: "📝",
-    color: "#EC4899",
-    textColor: "#9D174D",
-  },
-
-  project: {
-    icon: "🚀",
-    color: "#8B5CF6",
-    textColor: "#5B21B6",
-  },
-
-  coding: {
-    icon: "💻",
-    color: "#2563EB",
-    textColor: "#1E40AF",
-  },
-
-  meeting: {
-    icon: "👥",
-    color: "#0EA5E9",
-    textColor: "#075985",
-  },
-
-  reading: {
-    icon: "📖",
-    color: "#14B8A6",
-    textColor: "#115E59",
-  },
-
-  research: {
-    icon: "🔬",
-    color: "#7C3AED",
-    textColor: "#5B21B6",
-  },
-
-  writing: {
-    icon: "✍️",
-    color: "#F97316",
-    textColor: "#9A3412",
-  },
-
-  exercise: {
-    icon: "🏋️",
-    color: "#EF4444",
-    textColor: "#991B1B",
-  },
-
-  work: {
-    icon: "💼",
-    color: "#6366F1",
-    textColor: "#3730A3",
-  },
-
-  break: {
-    icon: "☕",
-    color: "#9CA3AF",
-    textColor: "#374151",
-  },
-
-  personal: {
-    icon: "🙂",
-    color: "#06B6D4",
-    textColor: "#164E63",
-  },
-
-  errands: {
-    icon: "🛒",
-    color: "#84CC16",
-    textColor: "#3F6212",
-  },
-
-  health: {
-    icon: "❤️",
-    color: "#DC2626",
-    textColor: "#991B1B",
-  },
-
-  other: {
-    icon: "✅",
-    color: "#6B7280",
-    textColor: "#374151",
-  },
-} as const;
+/* ------------------------------------------------------------------ */
+/* Component                                                            */
+/* ------------------------------------------------------------------ */
 
 export default function PlanTimeline({ days }: PlanTimelineProps) {
-  return (
-    <div className="flex flex-col gap-6">
-      {days.map((day, dayIdx) => (
-        <motion.div
-          key={`${day.day}-${day.date}`}
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            duration: 0.45,
-            delay: dayIdx * 0.12,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-2 h-2 rounded-full bg-[#4F46E5]" />
+  // Running index across all days so the stagger flows top to bottom
+  const offsets = days.reduce<number[]>((acc, _day, i) => {
+    acc.push(i === 0 ? 0 : acc[i - 1] + days[i - 1].items.length);
+    return acc;
+  }, []);
 
-            <div className="flex flex-col">
-              <span className="text-[11px] font-semibold uppercase tracking-widest text-[#4F46E5]">
+  return (
+    <div className="flex flex-col gap-8">
+      {days.map((day, dayIdx) => (
+        <motion.section
+          key={`${day.day}-${day.date}`}
+          variants={row}
+          custom={Math.min(offsets[dayIdx], 12)}
+          aria-label={`Day ${dayIdx + 1}: ${day.day}`}
+        >
+          {/* Day header */}
+          <div className="flex items-center gap-3">
+            <span className="size-2 shrink-0 rounded-full bg-[#d9b77a] shadow-[0_0_10px_rgba(217,183,122,0.6)]" />
+            <div className="flex flex-wrap items-baseline gap-x-3">
+              <span className="text-[11px] tracking-[0.14em] text-[#d9b77a] uppercase">
                 Day {dayIdx + 1}
               </span>
-              <span className="text-sm font-semibold text-[#111827]">
+              <span className="font-serif text-[18px] font-medium text-white">
                 {day.day}
               </span>
+              <span className="text-[12.5px] text-slate-400">{day.date}</span>
             </div>
-
-            <span className="text-xs text-[#6B7280]">{day.date}</span>
           </div>
 
-          <div className="flex flex-col gap-3 pl-4 border-l-2 border-[#F3F4F6]">
+          {/* Items */}
+          <ul className="mt-4 ml-[3px] flex flex-col gap-3 border-l border-white/10 pl-5">
             {day.items.map((item, itemIdx) => {
               const style =
-                TASK_STYLES[
-                  item.taskType.toLowerCase() as keyof typeof TASK_STYLES
-                ] ?? TASK_STYLES.other;
+                TASK_STYLES[item.taskType.toLowerCase()] ?? TASK_STYLES.other;
+              const Icon = style.icon;
 
               return (
-                <motion.div
+                <motion.li
                   key={item.id}
-                  initial={{
-                    opacity: 0,
-                    x: -8,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0,
-                  }}
-                  transition={{
-                    duration: 0.38,
-                    delay: dayIdx * 0.12 + itemIdx * 0.07,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
+                  variants={row}
+                  custom={Math.min(offsets[dayIdx] + itemIdx, 12)}
+                  className={`relative overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4 pl-5 transition-colors duration-200 hover:bg-white/[0.055] ${
+                    item.completed ? "opacity-60" : ""
+                  }`}
                 >
-                  <div className="relative rounded-2xl border border-[#F3F4F6] bg-white p-4 shadow-sm hover:shadow-md hover:border-[#E5E7EB] transition-all duration-200">
-                    <div
-                      className="absolute left-0 top-4 bottom-4 w-1 rounded-full"
-                      style={{
-                        backgroundColor: style.color,
-                      }}
-                    />
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-4 left-0 w-1 rounded-r-full"
+                    style={{ backgroundColor: style.color }}
+                  />
 
-                    <div className="pl-4 flex flex-col gap-2">
-                      <div className="flex justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">{style.icon}</span>
-
-                            <h3 className="font-semibold text-[15px] text-[#111827]">
-                              {item.title}
-                            </h3>
-                          </div>
-
-                          <div className="mt-2 flex items-center gap-2">
-                            <span
-                              className={`text-[10px] font-medium px-2 py-1 rounded-full ${
-                                item.priority === "High"
-                                  ? "bg-red-100 text-red-700"
-                                  : item.priority === "Medium"
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : "bg-green-100 text-green-700"
-                              }`}
-                            >
-                              {item.priority}
-                            </span>
-
-                            <span
-                              className={`text-[10px] font-medium px-2 py-1 rounded-full ${PERIOD_COLORS[item.period].label}`}
-                              style={{
-                                backgroundColor: `${PERIOD_COLORS[item.period].dot.includes("bg-[#") ? "#" : ""}`,
-                              }}
-                            >
-                              {item.period}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm font-semibold text-gray-700">
-                            {item.time}
-                          </span>
-
-                          <span
-                            className="mt-1 text-[10px] font-medium px-2 py-1 rounded-full"
-                            style={{
-                              backgroundColor: `${style.color}20`,
-                              color: style.textColor,
-                            }}
-                          >
-                            {item.duration}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-2 mt-1">
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 11 11"
-                          fill="none"
-                          className="mt-1 flex-shrink-0"
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg"
+                        style={{ backgroundColor: `${style.color}26`, color: style.color }}
+                      >
+                        <Icon className="size-[18px] stroke-[1.7]" />
+                      </span>
+                      <div className="min-w-0">
+                        <h3
+                          className={`text-[14.5px] leading-snug font-medium ${
+                            item.completed ? "text-slate-500 line-through" : "text-white"
+                          }`}
                         >
-                          <path
-                            d="M5.5 1L6.7 3.9L9.8 4.4L7.65 6.5L8.2 9.6L5.5 8.2L2.8 9.6L3.35 6.5L1.2 4.4L4.3 3.9L5.5 1Z"
-                            fill="#9CA3AF"
-                          />
-                        </svg>
-
-                        <p className="text-[11px] text-[#6B7280] italic leading-relaxed">
-                          {item.aiNote}
-                        </p>
+                          {item.title}
+                        </h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className={`${badge} ${PRIORITY[item.priority]}`}>
+                            {item.priority}
+                          </span>
+                          <span className={`${badge} ${PERIOD[item.period]}`}>
+                            {item.period}
+                          </span>
+                        </div>
                       </div>
                     </div>
+
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <span className="text-[13px] font-medium text-slate-100">
+                        {item.time}
+                      </span>
+                      <span className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-0.5 text-[11px] text-slate-300">
+                        {item.duration}
+                      </span>
+                    </div>
                   </div>
-                </motion.div>
+
+                  {item.aiNote && (
+                    <p className="mt-3.5 flex items-start gap-2 border-t border-white/[0.06] pt-3 text-[12px] leading-relaxed text-slate-400 italic">
+                      <Sparkles className="mt-0.5 size-3 shrink-0 text-[#d9b77a]" />
+                      {item.aiNote}
+                    </p>
+                  )}
+                </motion.li>
               );
             })}
-          </div>
-        </motion.div>
+          </ul>
+        </motion.section>
       ))}
     </div>
   );

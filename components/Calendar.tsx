@@ -17,6 +17,7 @@ import {
 import { useTaskContext } from "@/lib/task-context";
 import type { Plan, Task } from "@/types";
 import { card, focusRing, rise } from "@/components/styles/styles";
+import { Router } from "next/router";
 
 /* ================================================================== */
 /* Config                                                               */
@@ -859,11 +860,20 @@ function CalendarView({ now }: { now: Date }) {
   const viewProps = { today, byDay, onSelect: (ev: CalEvent) => setSelectedId(ev.id), onPickDay: goDay };
   const iconBtn = `flex size-9 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-white/[0.08] hover:text-white ${focusRing}`;
 
+  const router = Router;
+
   return (
-    <motion.section variants={rise} className={`${card} p-4 sm:p-6`}>
+    <motion.section variants={rise} className={`${card} p-4 sm:p-6 min-h-screen `}>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/"
+            className={`h-9 rounded-full flex flex-row items-center justify-center gap-2 pl-1 px-4 text-[16px] font-medium text-slate-100 transition-colors hover:bg-white/[0.06] ${focusRing}`}
+          >
+            <ChevronLeft className="size-[18px]" />
+            DashBoard
+          </Link>
           <button
             type="button"
             onClick={() => setAnchor(today)}

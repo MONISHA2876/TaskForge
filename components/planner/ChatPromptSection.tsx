@@ -1,271 +1,253 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { SendHorizonal, Mic, ImageIcon, X, Sparkles } from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { ImageIcon, Mic, SendHorizontal, Sparkles, ChevronLeft } from "lucide-react";
 import QuickPromptChips from "./QuickPromptChips";
 import VoiceModal from "./VoiceModal";
 import MessageBubble from "./MessageBubble";
 import TypingIndicator from "./TypingIndicator";
-import ImageAttachmentPreview from "./ImageAttachmentPreview";
+import ImageAttachmentPreview, { type AttachmentStatus } from "./ImageAttachmentPreview";
+import { blobToBase64, uid } from "./utils";
 import type { ChatMessage } from "./types";
+import { card, focusRing } from "@/components/styles/styles"; 
+import Link from "next/link";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+const MAX_IMAGE_MB = 8;
 
-function uid() {
-  return Math.random().toString(36).slice(2);
+const createWelcome = (): ChatMessage => ({
+  id: uid(),
+  role: "assistant",
+  content:
+    "Hi! I'm your AI productivity coach. Tell me what you'd like to accomplish — a study session, interview prep, workout plan, or anything else — and I'll ask a few questions to build the perfect plan for you.",
+  timestamp: new Date(),
+});
+
+interface Attachment {
+  name: string;
+  size: number;
+  preview: string;
+  base64: string;
+  mime: string;
+  status: AttachmentStatus;
+  visionText: string;
 }
-
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      // strip data url prefix
-      resolve(result.split(",")[1]);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// ─── props ──────────────────────────────────────────────────────────────────
 
 interface ChatPromptSectionProps {
   onGenerate: (prompt: string) => void;
   isGenerating: boolean;
 }
 
-// ─── component ──────────────────────────────────────────────────────────────
-
-export default function ChatPromptSection({
-  onGenerate,
-  isGenerating,
-}: ChatPromptSectionProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export default function ChatPrompt({ onGenerate, isGenerating }: ChatPromptSectionProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [createWelcome()]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showChips, setShowChips] = useState(true);
   const [voiceOpen, setVoiceOpen] = useState(false);
-
-  // Image attachment state
-  const [attachedFile, setAttachedFile] = useState<File | null>(null);
-  const [attachedPreview, setAttachedPreview] = useState<string>("");
-  const [attachedBase64, setAttachedBase64] = useState<string>("");
-  const [attachedMime, setAttachedMime] = useState<string>("");
-  const [visionText, setVisionText] = useState<string>("");
-  const [scanning, setScanning] = useState(false);
-  const [scanned, setScanned] = useState(false);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [notice, setNotice] = useState("");
+  const [dragging, setDragging] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll
+  const showChips = messages.length <= 1;
+  const hasConversation = messages.length > 1;
+  const scanning = attachment?.status === "scanning";
+  const hasInput = draft.trim().length > 0 || !!attachment;
+  const canSend = hasInput && !loading && !scanning;
+  const canGenerate = hasConversation && !isGenerating;
+
+  // Keep the newest message in view
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, loading]);
 
-  // Welcome message on mount
-  useEffect(() => {
-    const welcome: ChatMessage = {
-      id: uid(),
-      role: "assistant",
-      content:
-        "Hi! 👋 I'm your AI productivity coach. Tell me what you'd like to accomplish — a study session, interview prep, workout plan, or anything else — and I'll ask a few questions to build the perfect plan for you.",
-      timestamp: new Date(),
-    };
-    setMessages([welcome]);
-  }, []);
-
-  // ── send message ───────────────────────────────────────────────────────────
-
-  const sendMessage = useCallback(
-    async (textOverride?: string) => {
-      const text = (textOverride ?? draft).trim();
-      const hasImage = !!attachedBase64;
-
-      if (!text && !hasImage) return;
-      if (loading) return;
-
-      setShowChips(false);
-
-      // Build user message
-      const userMsg: ChatMessage = {
-        id: uid(),
-        role: "user",
-        content: text,
-        imagePreview: attachedPreview || undefined,
-        imageBase64: attachedBase64 || undefined,
-        imageMimeType: attachedMime || undefined,
-        timestamp: new Date(),
-      };
-
-      const nextMessages = [...messages, userMsg];
-      setMessages(nextMessages);
-      setDraft("");
-
-      // Clear attachment
-      const sentBase64 = attachedBase64;
-      const sentMime = attachedMime;
-      const sentVisionText = visionText;
-      clearAttachment();
-
-      setLoading(true);
-
-      try {
-        // Build final text — append vision-extracted text if available
-        const fullText = sentVisionText
-          ? `${text}\n\n[Image content extracted by Vision AI]:\n${sentVisionText}`
-          : text;
-
-        const res = await fetch("/api/planner-chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversation: nextMessages.slice(0, -1).map((m) => ({
-              role: m.role,
-              content: m.content,
-              imageBase64: m.imageBase64,
-              imageMimeType: m.imageMimeType,
-            })),
-            userInput: fullText,
-            imageBase64: sentBase64 || undefined,
-            imageMimeType: sentMime || undefined,
-          }),
-        });
-
-        const data = await res.json();
-
-        const aiMsg: ChatMessage = {
-          id: uid(),
-          role: "assistant",
-          content: data.message ?? "I couldn't respond. Please try again.",
-          timestamp: new Date(),
-        };
-
-        setMessages([...nextMessages, aiMsg]);
-      } catch {
-        setMessages([
-          ...nextMessages,
-          {
-            id: uid(),
-            role: "assistant",
-            content: "Something went wrong. Please try again.",
-            timestamp: new Date(),
-          },
-        ]);
-      } finally {
-        setLoading(false);
-        inputRef.current?.focus();
-      }
-    },
-    [
-      draft,
-      messages,
-      loading,
-      attachedBase64,
-      attachedPreview,
-      attachedMime,
-      visionText,
-    ],
-  );
-
-  // ── image attachment ────────────────────────────────────────────────────────
+  /* ---------------------------------------------------------------- */
+  /* Image attachment                                                   */
+  /* ---------------------------------------------------------------- */
 
   function clearAttachment() {
-    setAttachedFile(null);
-    setAttachedPreview("");
-    setAttachedBase64("");
-    setAttachedMime("");
-    setVisionText("");
-    setScanning(false);
-    setScanned(false);
+    if (attachment) URL.revokeObjectURL(attachment.preview);
+    setAttachment(null);
   }
 
-  async function handleImageFile(file: File) {
+  async function attachImage(file: File) {
     if (!file.type.startsWith("image/")) return;
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      setNotice(`Images must be under ${MAX_IMAGE_MB} MB.`);
+      return;
+    }
+    setNotice("");
+    if (attachment) URL.revokeObjectURL(attachment.preview);
 
-    // Preview
     const preview = URL.createObjectURL(file);
-    setAttachedFile(file);
-    setAttachedPreview(preview);
-    setAttachedMime(file.type);
-    setScanning(true);
-    setScanned(false);
-    setVisionText("");
+    setAttachment({
+      name: file.name,
+      size: file.size,
+      preview,
+      base64: "",
+      mime: file.type,
+      status: "scanning",
+      visionText: "",
+    });
 
-    // Base64 for API
-    const base64 = await fileToBase64(file);
-    setAttachedBase64(base64);
+    // Ignore updates if the user swapped / removed the image meanwhile
+    const patch = (p: Partial<Attachment>) =>
+      setAttachment((a) => (a && a.preview === preview ? { ...a, ...p } : a));
 
-    // Run Vision API
     try {
+      const base64 = await blobToBase64(file);
+      patch({ base64 });
+
       const res = await fetch("/api/vision-scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64 }),
       });
       const data = await res.json();
-      if (data.text) setVisionText(data.text);
+      patch(
+        data.text
+          ? { status: "done", visionText: data.text }
+          : { status: "failed" },
+      );
     } catch {
-      // Vision is optional — continue without it
-    } finally {
-      setScanning(false);
-      setScanned(true);
+      // Vision is optional — the image can still be sent
+      patch({ status: "failed" });
     }
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) void handleImageFile(file);
+    if (file) void attachImage(file);
     e.target.value = "";
   }
 
-  function handleDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
+    setDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) void handleImageFile(file);
+    if (file) void attachImage(file);
   }
 
-  // ── voice ──────────────────────────────────────────────────────────────────
-
-  function handleVoiceTranscript(text: string) {
-    setDraft((prev) => (prev ? `${prev} ${text}` : text));
-    inputRef.current?.focus();
+  function handlePaste(e: ClipboardEvent<HTMLTextAreaElement>) {
+    const file = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+    if (file) {
+      e.preventDefault();
+      void attachImage(file);
+    }
   }
 
-  // ── keyboard ───────────────────────────────────────────────────────────────
+  /* ---------------------------------------------------------------- */
+  /* Sending                                                            */
+  /* ---------------------------------------------------------------- */
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+  async function sendMessage(textOverride?: string) {
+    const text = (textOverride ?? draft).trim();
+    if ((!text && !attachment) || loading || scanning) return;
+
+    const sent = attachment;
+    const userMsg: ChatMessage = {
+      id: uid(),
+      role: "user",
+      content: text,
+      imagePreview: sent?.preview,
+      imageBase64: sent?.base64 || undefined,
+      imageMimeType: sent?.mime,
+      timestamp: new Date(),
+    };
+    const next = [...messages, userMsg];
+
+    setMessages(next);
+    setDraft("");
+    setNotice("");
+    setAttachment(null); // preview URL stays alive — the message still uses it
+    setLoading(true);
+
+    const userInput = sent?.visionText
+      ? `${text}\n\n[Image content extracted by Vision AI]:\n${sent.visionText}`
+      : text;
+
+    try {
+      const res = await fetch("/api/planner-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversation: messages.map(({ role, content, imageBase64, imageMimeType }) => ({
+            role,
+            content,
+            imageBase64,
+            imageMimeType,
+          })),
+          userInput,
+          imageBase64: sent?.base64 || undefined,
+          imageMimeType: sent?.mime,
+        }),
+      });
+      const data = await res.json();
+      setMessages([
+        ...next,
+        {
+          id: uid(),
+          role: "assistant",
+          content: data.message ?? "I couldn't respond. Please try again.",
+          timestamp: new Date(),
+        },
+      ]);
+    } catch {
+      setMessages([
+        ...next,
+        {
+          id: uid(),
+          role: "assistant",
+          content: "Something went wrong. Please try again.",
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setLoading(false);
+      inputRef.current?.focus();
+    }
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void sendMessage();
     }
   }
 
-  // ── chip select ────────────────────────────────────────────────────────────
-
-  function handleChipSelect(prompt: string) {
-    setShowChips(false);
-    void sendMessage(prompt);
+  function handleVoiceTranscript(text: string) {
+    setDraft((prev) => (prev ? `${prev} ${text}` : text));
+    inputRef.current?.focus();
   }
 
-  // ── generate plan ──────────────────────────────────────────────────────────
-
   function handleGeneratePlan() {
-    // Build a consolidated prompt from the whole conversation
-    const conversationSummary = messages
+    const summary = messages
       .filter((m) => m.role === "user")
       .map((m) => m.content)
       .join("\n");
-    onGenerate(conversationSummary || draft);
+    onGenerate(summary || draft);
   }
 
-  const hasConversation = messages.length > 1;
-  const canSend = (draft.trim().length > 0 || !!attachedBase64) && !loading;
+  /* ---------------------------------------------------------------- */
+  /* Render                                                             */
+  /* ---------------------------------------------------------------- */
+
+  const swap = {
+    initial: { opacity: 0, scale: 0.6 },
+    animate: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 0.6 },
+    transition: { duration: 0.15 },
+  };
 
   return (
     <>
@@ -278,267 +260,168 @@ export default function ChatPromptSection({
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          gap: "0",
-        }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="flex h-full min-h-0 flex-col gap-5"
       >
-        {/* ── Header ── */}
-        {showChips ? (
-          <div style={{ padding: "0 0 16px 0", flexShrink: 0 }}>
-            <motion.h2
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              style={{
-                fontSize: "24px",
-                fontWeight: 700,
-                color: "#111827",
-                letterSpacing: "-0.5px",
-                lineHeight: 1.25,
-                marginBottom: "6px",
-              }}
-            >
-              What would you like
-              <br />
-              to accomplish?
-            </motion.h2>
-            <p style={{ fontSize: "13.5px", color: "#6B7280" }}>
-              Chat with AI to refine your plan — then generate it.
-            </p>
-          </div>
-        ) : (
-          <motion.h2
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            style={{
-              fontSize: "24px",
-              fontWeight: 700,
-              color: "#111827",
-              letterSpacing: "-0.5px",
-              lineHeight: 1.25,
-              marginBottom: "6px",
-            }}
+        {/* Header */}
+        <header>
+          <Link
+            href="/"
+            className={`h-9 font-serif rounded-full flex flex-row items-center gap-2 pb-6 text-[16px] font-medium text-slate-100  ${focusRing}`}
           >
-            Refine your plan with AI - then generate it.
-          </motion.h2>
-        )}
-        {/* ── Quick chips (hide after first message) ── */}
-        <AnimatePresence>
+            <ChevronLeft className="size-[18px]" />
+            DashBoard
+          </Link>
+          <h2 className="font-serif text-[26px] leading-tight font-medium text-white">
+            {showChips ? (
+              <>
+                What would you like
+                <br />
+                to accomplish?
+              </>
+            ) : (
+              "Refine your plan"
+            )}
+          </h2>
+          <p className="mt-2 text-[13px] text-slate-400">
+            Chat with AI to refine your plan — then generate it.
+          </p>
+        </header>
+
+        {/* Quick prompts (only before the first message) */}
+        <AnimatePresence initial={false}>
           {showChips && (
             <motion.div
-              initial={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
+              exit={{ opacity: 0, height: 0, marginTop: -20 }}
               transition={{ duration: 0.2 }}
-              style={{
-                flexShrink: 0,
-                marginBottom: "14px",
-                overflow: "hidden",
-              }}
+              className="overflow-hidden"
             >
-              <QuickPromptChips onSelect={handleChipSelect} />
+              <QuickPromptChips onSelect={(prompt) => void sendMessage(prompt)} />
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* ── Chat messages ── */}
+        {/* Chat + composer */}
         <div
-          ref={scrollRef}
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            display: "flex",
-            flexDirection: "column",
-            gap: "14px",
-            padding: "16px",
-            background: "#F9FAFB",
-            borderRadius: "20px 20px 0 0",
-            border: "1px solid #E5E7EB",
-            borderBottom: "none",
-            minHeight: 0,
-            maxHeight: "60vh",
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
           }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          className={`${card} flex min-h-0 flex-1 flex-col overflow-hidden transition-colors ${
+            dragging ? "border-[#c9a45c]/60 bg-[#c9a45c]/[0.05]" : ""
+          }`}
         >
-          <AnimatePresence initial={false}>
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
-            ))}
-            {loading && <TypingIndicator key="typing" />}
-          </AnimatePresence>
-        </div>
+          <div
+            ref={scrollRef}
+            className="flex max-h-[55vh] min-h-[260px] flex-1 flex-col gap-4 overflow-y-auto p-4 xl:max-h-none xl:min-h-0"
+          >
+            <AnimatePresence initial={false}>
+              {messages.map((msg) => (
+                <MessageBubble key={msg.id} message={msg} />
+              ))}
+              {loading && <TypingIndicator key="typing" />}
+            </AnimatePresence>
+          </div>
 
-        {/* ── Image attachment preview ── */}
-        <AnimatePresence>
-          {attachedPreview && (
-            <ImageAttachmentPreview
-              preview={attachedPreview}
-              fileName={attachedFile?.name ?? "image"}
-              scanning={scanning}
-              scanned={scanned}
-              onRemove={clearAttachment}
-            />
-          )}
-        </AnimatePresence>
+          <div className="border-t border-white/[0.07] pb-3">
+            <AnimatePresence initial={false}>
+              {attachment && (
+                <ImageAttachmentPreview
+                  preview={attachment.preview}
+                  name={attachment.name}
+                  size={attachment.size}
+                  status={attachment.status}
+                  onRemove={clearAttachment}
+                />
+              )}
+            </AnimatePresence>
 
-        {/* ── Input area ── */}
-        <div
-          style={{
-            background: "#ffffff",
-            border: "1px solid #E5E7EB",
-            borderTop: attachedPreview ? "none" : "1px solid #E5E7EB",
-            borderRadius: attachedPreview ? "0 0 20px 20px" : "0 0 20px 20px",
-            padding: "12px 14px",
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "flex-end", gap: "10px" }}>
             <textarea
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={handleKeyDown}
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              placeholder="Type your message... or drop an image"
+              onPaste={handlePaste}
+              placeholder="Type your message, or drop an image…"
+              aria-label="Message"
               rows={2}
-              style={{
-                flex: 1,
-                resize: "none",
-                border: "none",
-                outline: "none",
-                fontSize: "13.5px",
-                color: "#111827",
-                background: "transparent",
-                lineHeight: 1.6,
-                fontFamily: "inherit",
-              }}
+              className="block w-full resize-none bg-transparent px-5 pt-4 text-[13.5px] leading-[1.6] text-white outline-none placeholder:text-slate-500"
             />
 
-            {/* Hidden file input */}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={handleFileChange}
-            />
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                flexShrink: 0,
-              }}
-            >
-              {/* Image button */}
-              <motion.button
-                whileHover={{ scale: 1.07 }}
-                whileTap={{ scale: 0.93 }}
-                onClick={() => fileRef.current?.click()}
-                title="Attach image"
-                style={{
-                  width: "34px",
-                  height: "34px",
-                  borderRadius: "10px",
-                  background: attachedPreview ? "#EEF2FF" : "#F3F4F6",
-                  border: attachedPreview
-                    ? "1.5px solid #A5B4FC"
-                    : "1px solid #E5E7EB",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                }}
-              >
-                <ImageIcon
-                  size={15}
-                  color={attachedPreview ? "#4F46E5" : "#6B7280"}
+            <div className="flex items-center justify-between gap-3 px-4 pt-2">
+              <div className="flex min-w-0 items-center gap-3">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={handleFileChange}
                 />
-              </motion.button>
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.06 }}
+                  whileTap={{ scale: 0.94 }}
+                  onClick={() => fileRef.current?.click()}
+                  aria-label="Attach image"
+                  title="Attach image"
+                  className={`flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors ${focusRing} ${
+                    attachment
+                      ? "border-[#c9a45c]/60 bg-[#c9a45c]/15 text-[#f0d9a8]"
+                      : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-[#c9a45c]/50 hover:bg-[#c9a45c]/10 hover:text-white"
+                  }`}
+                >
+                  <ImageIcon className="size-4" />
+                </motion.button>
 
-              {/* Voice button */}
-              <motion.button
-                whileHover={{ scale: 1.07 }}
-                whileTap={{ scale: 0.93 }}
-                onClick={() => setVoiceOpen(true)}
-                title="Voice input"
-                style={{
-                  width: "34px",
-                  height: "34px",
-                  borderRadius: "10px",
-                  background: "#F3F4F6",
-                  border: "1px solid #E5E7EB",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                }}
-              >
-                <Mic size={15} color="#6B7280" />
-              </motion.button>
+                <span
+                  className={`hidden truncate text-[11px] sm:block ${
+                    notice ? "text-rose-300" : "text-slate-500"
+                  }`}
+                >
+                  {notice || "Enter to send · Shift+Enter for new line"}
+                </span>
+              </div>
 
-              {/* Send button */}
-              <motion.button
-                whileHover={canSend ? { scale: 1.07 } : {}}
-                whileTap={canSend ? { scale: 0.93 } : {}}
-                onClick={() => void sendMessage()}
-                disabled={!canSend}
-                style={{
-                  width: "34px",
-                  height: "34px",
-                  borderRadius: "10px",
-                  background: canSend ? "#4F46E5" : "#E5E7EB",
-                  border: "none",
-                  cursor: canSend ? "pointer" : "default",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "background 0.15s",
-                }}
-              >
-                <SendHorizonal
-                  size={14}
-                  color={canSend ? "#ffffff" : "#9CA3AF"}
-                />
-              </motion.button>
+              {/* Primary action: mic when empty, send once there's input */}
+              <AnimatePresence mode="wait" initial={false}>
+                {hasInput ? (
+                  <motion.button
+                    key="send"
+                    type="button"
+                    {...swap}
+                    onClick={() => void sendMessage()}
+                    disabled={!canSend}
+                    aria-label="Send message"
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-[filter,background-color] ${focusRing} ${
+                      canSend
+                        ? "bg-gradient-to-r from-[#ecd5a5] to-[#c9a45c] text-[#1c1406] hover:brightness-110"
+                        : "bg-white/[0.08] text-slate-500"
+                    }`}
+                  >
+                    <SendHorizontal className="size-4" />
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    key="mic"
+                    type="button"
+                    {...swap}
+                    onClick={() => setVoiceOpen(true)}
+                    aria-label="Dictate with your voice"
+                    title="Dictate with your voice"
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-full border border-[#c9a45c]/50 bg-[#c9a45c]/10 text-[#f0d9a8] transition-colors hover:bg-[#c9a45c]/20 ${focusRing}`}
+                  >
+                    <Mic className="size-[18px]" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginTop: "8px",
-            }}
-          >
-            <span style={{ fontSize: "10.5px", color: "#D1D5DB" }}>
-              Enter to send · Shift+Enter for new line · Drop image to attach
-            </span>
-            {draft.length > 0 && (
-              <button
-                onClick={() => setDraft("")}
-                style={{
-                  fontSize: "10.5px",
-                  color: "#9CA3AF",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                Clear
-              </button>
-            )}
           </div>
         </div>
 
-        {/* ── Generate Plan button ── */}
-        <div style={{ paddingTop: "14px", flexShrink: 0 }}>
+        {/* Generate */}
+        <div className="shrink-0">
           <AnimatePresence>
             {hasConversation && (
               <motion.div
@@ -546,113 +429,48 @@ export default function ChatPromptSection({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 8 }}
                 transition={{ duration: 0.25 }}
-                style={{
-                  marginBottom: "10px",
-                  padding: "10px 14px",
-                  background: "#EEF2FF",
-                  borderRadius: "12px",
-                  border: "1px solid #C7D2FE",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                }}
+                className="mb-3 flex items-center gap-2.5 rounded-xl border border-[#c9a45c]/25 bg-[#c9a45c]/[0.07] px-4 py-2.5"
               >
-                <Sparkles size={14} color="#4F46E5" />
-                <p
-                  style={{
-                    fontSize: "12.5px",
-                    color: "#4F46E5",
-                    fontWeight: 500,
-                  }}
-                >
-                  Happy with the details? Click Generate Plan to create your
-                  personalized schedule.
+                <Sparkles className="size-3.5 shrink-0 text-[#e6c78f]" />
+                <p className="text-[12.5px] text-[#f0d9a8]">
+                  Happy with the details? Generate your personalized schedule.
                 </p>
               </motion.div>
             )}
           </AnimatePresence>
 
           <motion.button
-            whileHover={!isGenerating ? { scale: 1.015, y: -1 } : {}}
-            whileTap={!isGenerating ? { scale: 0.985 } : {}}
+            type="button"
+            whileHover={canGenerate ? { y: -1 } : undefined}
+            whileTap={canGenerate ? { scale: 0.985 } : undefined}
             onClick={handleGeneratePlan}
-            disabled={isGenerating || messages.length < 2}
-            style={{
-              width: "100%",
-              padding: "14px",
-              borderRadius: "16px",
-              border: "none",
-              cursor:
-                isGenerating || messages.length < 2 ? "not-allowed" : "pointer",
-              fontSize: "15px",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "10px",
-              background:
-                isGenerating || messages.length < 2 ? "#F3F4F6" : "#4F46E5",
-              color:
-                isGenerating || messages.length < 2 ? "#9CA3AF" : "#ffffff",
-              boxShadow:
-                messages.length >= 2 && !isGenerating
-                  ? "0 4px 16px rgba(79,70,229,0.28)"
-                  : "none",
-              transition: "all 0.2s",
-            }}
+            disabled={!canGenerate}
+            className={`flex h-12 w-full items-center justify-center gap-2.5 rounded-full text-[14.5px] font-semibold transition-[filter,background-color] ${focusRing} ${
+              canGenerate
+                ? "bg-gradient-to-r from-[#ecd5a5] via-[#e0bf86] to-[#c9a45c] text-[#1c1406] shadow-[0_8px_24px_rgba(201,164,92,0.25)] hover:brightness-110"
+                : "bg-white/[0.06] text-slate-500"
+            }`}
           >
-            <AnimatePresence mode="wait">
-              {isGenerating ? (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
-                >
-                  <div style={{ display: "flex", gap: "4px" }}>
-                    {[0, 1, 2].map((i) => (
-                      <motion.span
-                        key={i}
-                        style={{
-                          width: "6px",
-                          height: "6px",
-                          borderRadius: "50%",
-                          background: "#9CA3AF",
-                          display: "block",
-                        }}
-                        animate={{
-                          opacity: [0.3, 1, 0.3],
-                          scale: [0.8, 1, 0.8],
-                        }}
-                        transition={{
-                          duration: 0.8,
-                          repeat: Infinity,
-                          delay: i * 0.2,
-                        }}
-                      />
-                    ))}
-                  </div>
-                  Building your plan...
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="idle"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path
-                      d="M8 1L10.39 5.26L15 6.18L11.5 9.59L12.22 14.18L8 12L3.78 14.18L4.5 9.59L1 6.18L5.61 5.26L8 1Z"
-                      fill="currentColor"
+            {isGenerating ? (
+              <>
+                <span className="flex gap-1" aria-hidden="true">
+                  {[0, 1, 2].map((i) => (
+                    <motion.span
+                      key={i}
+                      className="size-1.5 rounded-full bg-slate-400"
+                      animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
+                      transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.2 }}
                     />
-                  </svg>
-                  Generate Plan
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  ))}
+                </span>
+                Building your plan…
+              </>
+            ) : (
+              <>
+                <Sparkles className="size-4" />
+                Generate Plan
+              </>
+            )}
           </motion.button>
         </div>
       </motion.div>
